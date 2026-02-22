@@ -1,0 +1,28 @@
+import { IsIn, IsNumberString, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class SwapDto {
+  @ApiProperty({ example: '0x049...' })
+  @IsString()
+  wallet: string;
+
+  @ApiProperty({ enum: ['adusd', 'adngn'] })
+  @IsIn(['adusd', 'adngn'])
+  token_in: 'adusd' | 'adngn';
+
+  @ApiProperty({ description: 'Amount in wei (18 decimals)', example: '1000000000000000000' })
+  @IsNumberString()
+  amount_in: string;
+
+  @ApiProperty({ enum: ['adusd', 'adngn'] })
+  @IsIn(['adusd', 'adngn'])
+  token_out: 'adusd' | 'adngn';
+
+  @ApiProperty({ description: 'Min amount out (slippage protection)', example: '990000000000000000' })
+  @IsNumberString()
+  min_amount_out: string;
+
+  @ApiProperty({ description: 'Commitment hash (computed client-side)', example: '0x...' })
+  @IsString()
+  commitment: string;
+}
