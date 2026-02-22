@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
+import { CommonModule } from './common/common.module';
 import { StarknetModule } from './starknet/starknet.module';
 import { TokenModule } from './token/token.module';
 import { SwapModule } from './swap/swap.module';
@@ -21,6 +22,7 @@ import { QueueModule } from './queue/queue.module';
       },
     }),
     PrismaModule,
+    CommonModule,
     StarknetModule,
     QueueModule,
     TokenModule,
