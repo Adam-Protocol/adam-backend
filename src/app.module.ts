@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
 import { StarknetModule } from './starknet/starknet.module';
@@ -30,5 +32,7 @@ import { QueueModule } from './queue/queue.module';
     OfframpModule,
     ActivityModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
