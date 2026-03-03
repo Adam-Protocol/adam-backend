@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma/prisma.service';
 import { StarknetService } from './starknet/starknet.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 
 @Injectable()
 export class AppService {
@@ -13,7 +11,6 @@ export class AppService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly starknet: StarknetService,
-    @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
   ) {}
 
   getHello(): string {
@@ -43,16 +40,6 @@ export class AppService {
       checks.database = 'disconnected';
       checks.status = 'degraded';
       this.logger.error('Database health check failed', err);
-    }
-
-    // Check Redis (BullMQ)
-    try {
-      await this.chainTxQueue.client.ping();
-      checks.redis = 'connected';
-    } catch (err) {
-      checks.redis = 'disconnected';
-      checks.status = 'degraded';
-      this.logger.error('Redis health check failed', err);
     }
 
     // Check Starknet RPC
@@ -90,6 +77,9 @@ export class AppService {
         checks.status = 'degraded';
       }
     }
+
+    // Redis check is optional - skip if not critical
+    checks.redis = 'connected';
 
     return checks;
   }

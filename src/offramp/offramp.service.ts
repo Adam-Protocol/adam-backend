@@ -90,8 +90,8 @@ export class OfframpService {
       },
       {
         auth: {
-          username: this.config.get('MONNIFY_API_KEY'),
-          password: this.config.get('MONNIFY_SECRET_KEY'),
+          username: this.config.get<string>('MONNIFY_API_KEY') || '',
+          password: this.config.get<string>('MONNIFY_SECRET_KEY') || '',
         },
       },
     );

@@ -17,10 +17,15 @@ export class EventListenerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Get the latest block on startup
-    const block = await this.starknet.rpcProvider.getBlockNumber();
-    this.lastProcessedBlock = block - 100; // Start from 100 blocks ago
-    this.logger.log(`Event listener initialized at block ${this.lastProcessedBlock}`);
+    try {
+      // Get the latest block on startup
+      const block = await this.starknet.rpcProvider.getBlockNumber();
+      this.lastProcessedBlock = block - 100; // Start from 100 blocks ago
+      this.logger.log(`Event listener initialized at block ${this.lastProcessedBlock}`);
+    } catch (err) {
+      this.logger.warn('Event listener initialization failed (RPC may be unavailable)', err);
+      this.lastProcessedBlock = 0;
+    }
   }
 
   /**

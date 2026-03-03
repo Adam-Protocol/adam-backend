@@ -2,26 +2,36 @@
  * Grant RATE_SETTER_ROLE to backend wallet
  * 
  * Run this script once after deployment:
- * npx ts-node src/scripts/grant-rate-setter-role.ts
+ * npx ts-node -r tsconfig-paths/register src/scripts/grant-rate-setter-role.ts
  */
-import { config } from 'dotenv';
 import { Account, RpcProvider, hash } from 'starknet';
+import * as fs from 'fs';
+import * as path from 'path';
 
-config();
+// Load env from .env file manually
+const envPath = path.join(__dirname, '../../.env');
+const envContent = fs.readFileSync(envPath, 'utf-8');
+const env: Record<string, string> = {};
+envContent.split('\n').forEach((line) => {
+  const [key, value] = line.split('=');
+  if (key && value) {
+    env[key.trim()] = value.trim().replace(/^["']|["']$/g, '');
+  }
+});
 
 async function main() {
   const provider = new RpcProvider({
-    nodeUrl: process.env.STARKNET_RPC_URL!,
+    nodeUrl: env.STARKNET_RPC_URL!,
   });
 
   const account = new Account(
     provider,
-    process.env.DEPLOYER_ADDRESS!,
-    process.env.DEPLOYER_PRIVATE_KEY!,
+    env.DEPLOYER_ADDRESS!,
+    env.DEPLOYER_PRIVATE_KEY!,
   );
 
-  const swapAddress = process.env.ADAM_SWAP_ADDRESS!;
-  const backendWallet = process.env.DEPLOYER_ADDRESS!; // Backend uses deployer wallet
+  const swapAddress = env.ADAM_SWAP_ADDRESS!;
+  const backendWallet = env.DEPLOYER_ADDRESS!; // Backend uses deployer wallet
 
   // Calculate RATE_SETTER_ROLE hash
   const RATE_SETTER_ROLE = hash.getSelectorFromName('RATE_SETTER_ROLE');

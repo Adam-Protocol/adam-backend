@@ -1,28 +1,38 @@
 /**
  * Verify all roles are correctly configured
  * 
- * Run: npx ts-node src/scripts/verify-roles.ts
+ * Run: npx ts-node -r tsconfig-paths/register src/scripts/verify-roles.ts
  */
-import { config } from 'dotenv';
 import { Account, RpcProvider, Contract, hash } from 'starknet';
+import * as fs from 'fs';
+import * as path from 'path';
 
-config();
+// Load env from .env file manually
+const envPath = path.join(__dirname, '../../.env');
+const envContent = fs.readFileSync(envPath, 'utf-8');
+const env: Record<string, string> = {};
+envContent.split('\n').forEach((line) => {
+  const [key, value] = line.split('=');
+  if (key && value) {
+    env[key.trim()] = value.trim().replace(/^["']|["']$/g, '');
+  }
+});
 
 async function main() {
   const provider = new RpcProvider({
-    nodeUrl: process.env.STARKNET_RPC_URL!,
+    nodeUrl: env.STARKNET_RPC_URL!,
   });
 
   const account = new Account(
     provider,
-    process.env.DEPLOYER_ADDRESS!,
-    process.env.DEPLOYER_PRIVATE_KEY!,
+    env.DEPLOYER_ADDRESS!,
+    env.DEPLOYER_PRIVATE_KEY!,
   );
 
-  const adusdAddress = process.env.ADUSD_ADDRESS!;
-  const adngnAddress = process.env.ADNGN_ADDRESS!;
-  const swapAddress = process.env.ADAM_SWAP_ADDRESS!;
-  const poolAddress = process.env.ADAM_POOL_ADDRESS!;
+  const adusdAddress = env.ADUSD_ADDRESS!;
+  const adngnAddress = env.ADNGN_ADDRESS!;
+  const swapAddress = env.ADAM_SWAP_ADDRESS!;
+  const poolAddress = env.ADAM_POOL_ADDRESS!;
 
   console.log('=== Role Verification ===\n');
 

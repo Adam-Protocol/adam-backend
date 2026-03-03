@@ -7,7 +7,6 @@ import {
   CallData,
   stark,
   hash,
-  pedersen,
   uint256,
   shortString,
 } from 'starknet';
@@ -16,18 +15,28 @@ import {
 export class StarknetService {
   private readonly logger = new Logger(StarknetService.name);
   private readonly provider: RpcProvider;
-  private readonly account: Account;
+  private readonly account: Account | null;
 
   constructor(private readonly config: ConfigService) {
     this.provider = new RpcProvider({
-      nodeUrl: this.config.get<string>('STARKNET_RPC_URL'),
+      nodeUrl: this.config.get<string>('STARKNET_RPC_URL')!,
     });
 
-    this.account = new Account(
-      this.provider,
-      this.config.get<string>('DEPLOYER_ADDRESS'),
-      this.config.get<string>('DEPLOYER_PRIVATE_KEY'),
-    );
+    const deployerAddress = this.config.get<string>('DEPLOYER_ADDRESS');
+    const deployerPrivateKey = this.config.get<string>('DEPLOYER_PRIVATE_KEY');
+
+    // Only create account if credentials are properly configured
+    if (
+      deployerAddress &&
+      deployerPrivateKey &&
+      !deployerAddress.includes('...') &&
+      !deployerPrivateKey.includes('...')
+    ) {
+      this.account = new Account(this.provider, deployerAddress, deployerPrivateKey);
+    } else {
+      this.account = null;
+      this.logger.warn('Starknet credentials not configured. Some operations will be unavailable.');
+    }
   }
 
   get rpcProvider() {
@@ -35,13 +44,16 @@ export class StarknetService {
   }
 
   get deployerAccount() {
+    if (!this.account) {
+      throw new Error('Starknet account not configured. Set DEPLOYER_ADDRESS and DEPLOYER_PRIVATE_KEY in .env');
+    }
     return this.account;
   }
 
   /** Load a contract ABI by address */
   async getContract(address: string): Promise<Contract> {
     const { abi } = await this.provider.getClassAt(address);
-    return new Contract(abi, address, this.account);
+    return new Contract(abi, address, this.deployerAccount);
   }
 
   /**
@@ -49,29 +61,17 @@ export class StarknetService {
    * Used by the queue processors.
    */
   async execute(calls: any[]): Promise<string> {
-    const { transaction_hash } = await this.account.execute(calls);
+    const { transaction_hash } = await this.deployerAccount.execute(calls);
     await this.provider.waitForTransaction(transaction_hash);
     return transaction_hash;
   }
 
-  /**
-   * Compute Pedersen commitment client-side (for the backend commitment helper).
-   * commitment = pedersen(amount_felt, secret_felt)
-   */
-  computeCommitment(amount: bigint, secret: bigint): string {
-    return pedersen(amount.toString(), secret.toString());
-  }
-
-  /**
-   * Compute nullifier.
-   * nullifier = pedersen(secret_felt, nullifier_key_felt)
-   */
-  computeNullifier(secret: bigint, nullifierKey: bigint): string {
-    return pedersen(secret.toString(), nullifierKey.toString());
-  }
-
   /** Convert a u256 amount to a pair of felts for contract calls */
   toUint256(amount: bigint): { low: string; high: string } {
-    return uint256.bnToUint256(amount);
+    const u256 = uint256.bnToUint256(amount);
+    return {
+      low: u256.low.toString(),
+      high: u256.high.toString(),
+    };
   }
 }
