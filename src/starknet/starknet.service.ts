@@ -4,11 +4,8 @@ import {
   Account,
   Contract,
   RpcProvider,
-  CallData,
-  stark,
-  hash,
   uint256,
-  shortString,
+  constants,
 } from 'starknet';
 
 @Injectable()
@@ -19,10 +16,11 @@ export class StarknetService {
 
   constructor(private readonly config: ConfigService) {
     // Create RPC provider with specific configuration for Alchemy
+    const chainIdConfig = this.config.get<string>('STARKNET_CHAIN_ID');
     this.provider = new RpcProvider({
       nodeUrl: this.config.get<string>('STARKNET_RPC_URL')!,
-      // Specify chain ID to help with block identification
-      chainId: this.config.get<string>('STARKNET_CHAIN_ID') || 'SN_SEPOLIA',
+      // Use proper StarknetChainId constant
+      chainId: chainIdConfig === 'SN_SEPOLIA' ? constants.StarknetChainId.SN_SEPOLIA : undefined,
     });
 
     const deployerAddress = this.config.get<string>('DEPLOYER_ADDRESS');
@@ -35,7 +33,11 @@ export class StarknetService {
       !deployerAddress.includes('...') &&
       !deployerPrivateKey.includes('...')
     ) {
-      this.account = new Account(this.provider, deployerAddress, deployerPrivateKey, '1');
+      this.account = new Account({
+        provider: this.provider,
+        address: deployerAddress,
+        signer: deployerPrivateKey,
+      });
     } else {
       this.account = null;
       this.logger.warn('Starknet credentials not configured. Some operations will be unavailable.');
@@ -56,7 +58,7 @@ export class StarknetService {
   /** Load a contract ABI by address */
   async getContract(address: string): Promise<Contract> {
     const { abi } = await this.provider.getClassAt(address);
-    return new Contract(abi, address, this.deployerAccount);
+    return new Contract({ abi, address, providerOrAccount: this.deployerAccount });
   }
 
   /**
@@ -65,19 +67,9 @@ export class StarknetService {
    */
   async execute(calls: any[]): Promise<string> {
     try {
-      // Get nonce using "latest" block instead of "pending" to avoid Alchemy RPC issues
-      const nonce = await this.deployerAccount.getNonce('latest');
-      
-      // Build the transaction with explicit nonce
-      const { transaction_hash } = await this.deployerAccount.execute(
-        calls,
-        undefined,
-        {
-          nonce,
-          maxFee: undefined, // Let starknet-js calculate max fee
-        }
-      );
-      
+      // Execute transaction with proper v9.2.1 signature
+      const { transaction_hash } = await this.deployerAccount.execute(calls);
+
       await this.provider.waitForTransaction(transaction_hash);
       return transaction_hash;
     } catch (error) {

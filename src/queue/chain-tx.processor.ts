@@ -38,7 +38,7 @@ export class ChainTxProcessor extends WorkerHost {
   }
 
   private async processBuy(data: any) {
-    const { transactionId, wallet, amount_in, token_out, commitment } = data;
+    const { transactionId, amount_in, token_out, commitment } = data;
 
     try {
       await this.prisma.transaction.update({
@@ -59,13 +59,13 @@ export class ChainTxProcessor extends WorkerHost {
         {
           contractAddress: usdcAddress,
           entrypoint: 'approve',
-          calldata: [swapAddress, amountU256.low, amountU256.high],
+          calldata: [swapAddress, amountU256.low.toString(), amountU256.high.toString()],
         },
         // Then buy
         {
           contractAddress: swapAddress,
           entrypoint: 'buy',
-          calldata: [usdcAddress, amountU256.low, amountU256.high, tokenOutAddress, commitment],
+          calldata: [usdcAddress, amountU256.low.toString(), amountU256.high.toString(), tokenOutAddress, commitment],
         },
       ]);
 
@@ -85,7 +85,7 @@ export class ChainTxProcessor extends WorkerHost {
   }
 
   private async processSell(data: any) {
-    const { transactionId, wallet, token_in, amount, nullifier, commitment } = data;
+    const { transactionId, token_in, amount, nullifier, commitment } = data;
 
     try {
       await this.prisma.transaction.update({
@@ -103,7 +103,7 @@ export class ChainTxProcessor extends WorkerHost {
         {
           contractAddress: swapAddress,
           entrypoint: 'sell',
-          calldata: [tokenInAddress, amountU256.low, amountU256.high, nullifier, commitment],
+          calldata: [tokenInAddress, amountU256.low.toString(), amountU256.high.toString(), nullifier, commitment],
         },
       ]);
 
@@ -158,9 +158,9 @@ export class ChainTxProcessor extends WorkerHost {
           entrypoint: 'swap',
           calldata: [
             tokenInAddr,
-            amountInU256.low, amountInU256.high,
+            amountInU256.low.toString(), amountInU256.high.toString(),
             tokenOutAddr,
-            minOutU256.low, minOutU256.high,
+            minOutU256.low.toString(), minOutU256.high.toString(),
             commitment,
           ],
         },
@@ -199,13 +199,13 @@ export class ChainTxProcessor extends WorkerHost {
         {
           contractAddress: swapAddress,
           entrypoint: 'set_rate',
-          calldata: [adusdAddress, adngnAddress, rateU256.low, rateU256.high],
+          calldata: [adusdAddress, adngnAddress, rateU256.low.toString(), rateU256.high.toString()],
         },
         // ADNGN -> ADUSD
         {
           contractAddress: swapAddress,
           entrypoint: 'set_rate',
-          calldata: [adngnAddress, adusdAddress, inverseU256.low, inverseU256.high],
+          calldata: [adngnAddress, adusdAddress, inverseU256.low.toString(), inverseU256.high.toString()],
         },
       ]);
 
