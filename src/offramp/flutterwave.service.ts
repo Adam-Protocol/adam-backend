@@ -4,14 +4,6 @@ import axios, { AxiosInstance } from 'axios';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
-interface FlutterwaveAuthResponse {
-  access_token: string;
-  expires_in: number;
-  refresh_expires_in: number;
-  refresh_token: string;
-  token_type: string;
-}
-
 interface FlutterwaveTransferPayload {
   account_bank: string;
   account_number: string;
@@ -23,63 +15,69 @@ interface FlutterwaveTransferPayload {
   debit_currency?: string;
 }
 
+interface FlutterwaveRateResponse {
+  status: string;
+  message: string;
+  data: {
+    rate: number;
+    source: string;
+    destination: string;
+  };
+}
+
+interface FlutterwaveTransferResponse {
+  status: string;
+  message: string;
+  data: {
+    id: number;
+    account_number: string;
+    bank_code: string;
+    full_name: string;
+    created_at: string;
+    currency: string;
+    amount: number;
+    fee: number;
+    status: string;
+    reference: string;
+    narration: string;
+    complete_message: string;
+  };
+}
+
 @Injectable()
 export class FlutterwaveService {
   private readonly logger = new Logger(FlutterwaveService.name);
   private axiosInstance: AxiosInstance;
-  private accessToken: string | null = null;
-  private tokenExpiry: Date | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
     this.axiosInstance = axios.create({
+      baseURL: 'https://api.flutterwave.com/v3',
       timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
   }
 
-  /** Authenticate with Flutterwave and get access token */
-  private async authenticate(): Promise<string> {
-    // Return cached token if still valid
-    if (this.accessToken && this.tokenExpiry && new Date() < this.tokenExpiry) {
-      return this.accessToken;
+  /** Get Flutterwave API key */
+  private getApiKey(): string {
+    const secretKey = this.config.get<string>('FLUTTERWAVE_SECRET_KEY');
+    if (!secretKey) {
+      throw new Error('FLUTTERWAVE_SECRET_KEY not configured');
     }
+    return secretKey;
+  }
 
-    try {
-      const authUrl = this.config.get<string>('FLUTTERWAVE_AUTH_URL');
-      const clientId = this.config.get<string>('FLUTTERWAVE_PUBLIC_KEY');
-      const clientSecret = this.config.get<string>('FLUTTERWAVE_SECRET_KEY');
-
-      if (!authUrl || !clientId || !clientSecret) {
-        throw new Error('Flutterwave configuration missing');
-      }
-
-      const params = new URLSearchParams();
-      params.append('grant_type', 'client_credentials');
-      params.append('client_id', clientId);
-      params.append('client_secret', clientSecret);
-
-      const response = await this.axiosInstance.post<FlutterwaveAuthResponse>(
-        authUrl,
-        params,
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        },
-      );
-
-      this.accessToken = response.data.access_token;
-      // Set expiry 5 minutes before actual expiry for safety
-      this.tokenExpiry = new Date(Date.now() + (response.data.expires_in - 300) * 1000);
-
-      this.logger.log('Flutterwave authentication successful');
-      return this.accessToken;
-    } catch (error) {
-      this.logger.error('Flutterwave authentication failed', error.response?.data || error.message);
-      throw new Error('Failed to authenticate with Flutterwave');
+  /** Get Flutterwave public key */
+  private getPublicKey(): string {
+    const publicKey = this.config.get<string>('FLUTTERWAVE_PUBLIC_KEY');
+    if (!publicKey) {
+      throw new Error('FLUTTERWAVE_PUBLIC_KEY not configured');
     }
+    return publicKey;
   }
 
   /** Get status of a transfer by reference */
@@ -216,7 +214,7 @@ export class FlutterwaveService {
     const { transactionId, amount, currency, bank_account, bank_code, narration } = params;
 
     try {
-      const token = await this.authenticate();
+      const apiKey = this.getApiKey();
       const reference = `ADAM-${transactionId}-${Date.now()}`;
 
       const appUrl = this.config.get<string>('APP_URL');
@@ -230,16 +228,19 @@ export class FlutterwaveService {
         callback_url: appUrl ? `${appUrl}/offramp/webhook` : undefined,
       };
 
-      const response = await this.axiosInstance.post(
-        'https://api.flutterwave.com/v3/transfers',
+      const response = await this.axiosInstance.post<FlutterwaveTransferResponse>(
+        '/transfers',
         transferPayload,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
           },
         },
       );
+
+      if (response.data.status !== 'success') {
+        throw new Error(response.data.message || 'Transfer initiation failed');
+      }
 
       await this.prisma.transaction.update({
         where: { id: transactionId },
@@ -247,7 +248,7 @@ export class FlutterwaveService {
       });
 
       this.logger.log(`Flutterwave transfer initiated: ${reference}`);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       this.logger.error('Flutterwave transfer failed', error.response?.data || error.message);
 
@@ -255,7 +256,7 @@ export class FlutterwaveService {
         where: { id: transactionId },
         data: {
           status: 'failed',
-          error: error.response?.data?.message || 'Transfer initiation failed',
+          error: error.response?.data?.message || error.message || 'Transfer initiation failed',
         },
       });
 
@@ -266,10 +267,10 @@ export class FlutterwaveService {
   /** Get exchange rate from Flutterwave */
   async getExchangeRate(from: string, to: string, amount: number = 1): Promise<number> {
     try {
-      const token = await this.authenticate();
+      const apiKey = this.getApiKey();
 
-      const response = await this.axiosInstance.get(
-        `https://api.flutterwave.com/v3/transfers/rates`,
+      const response = await this.axiosInstance.get<FlutterwaveRateResponse>(
+        '/transfers/rates',
         {
           params: {
             amount,
@@ -277,10 +278,14 @@ export class FlutterwaveService {
             source_currency: from,
           },
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${apiKey}`,
           },
         },
       );
+
+      if (response.data.status !== 'success') {
+        throw new Error(response.data.message || 'Failed to fetch exchange rate');
+      }
 
       const rate = response.data.data.rate;
       this.logger.log(`Flutterwave rate: 1 ${from} = ${rate} ${to}`);
