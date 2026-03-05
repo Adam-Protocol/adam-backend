@@ -27,7 +27,7 @@ async function main() {
   const account = new Account(
     provider,
     env.DEPLOYER_ADDRESS!,
-    env.DEPLOYER_PRIVATE_KEY!,
+    env.DEPLOYER_PRIVATE_KEY!
   );
 
   const swapAddress = env.ADAM_SWAP_ADDRESS!;
@@ -41,17 +41,33 @@ async function main() {
   console.log(`Backend Wallet: ${backendWallet}`);
   console.log(`Role Hash: ${RATE_SETTER_ROLE}`);
 
-  const { transaction_hash } = await account.execute([
-    {
-      contractAddress: swapAddress,
-      entrypoint: 'grant_role',
-      calldata: [RATE_SETTER_ROLE, backendWallet],
-    },
-  ]);
+  try {
+    // Get nonce manually using 'latest' block
+    const nonce = await provider.getNonceForAddress(env.DEPLOYER_ADDRESS!, 'latest');
+    console.log(`Using nonce: ${nonce}`);
 
-  console.log(`Transaction submitted: ${transaction_hash}`);
-  await provider.waitForTransaction(transaction_hash);
-  console.log('✅ RATE_SETTER_ROLE granted successfully!');
+    const { transaction_hash } = await account.execute(
+      [
+        {
+          contractAddress: swapAddress,
+          entrypoint: 'grant_role',
+          calldata: [RATE_SETTER_ROLE, backendWallet],
+        },
+      ],
+      undefined,
+      { nonce, skipValidate: false }
+    );
+
+    console.log(`Transaction submitted: ${transaction_hash}`);
+    await provider.waitForTransaction(transaction_hash);
+    console.log('✅ RATE_SETTER_ROLE granted successfully!');
+  } catch (error: any) {
+    if (error.message?.includes('already granted') || error.message?.includes('already has role')) {
+      console.log('✅ RATE_SETTER_ROLE already granted!');
+    } else {
+      throw error;
+    }
+  }
 }
 
 main().catch((err) => {
