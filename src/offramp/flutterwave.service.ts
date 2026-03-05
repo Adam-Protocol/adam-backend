@@ -51,13 +51,18 @@ export class FlutterwaveService {
       const clientId = this.config.get<string>('FLUTTERWAVE_PUBLIC_KEY');
       const clientSecret = this.config.get<string>('FLUTTERWAVE_SECRET_KEY');
 
+      if (!authUrl || !clientId || !clientSecret) {
+        throw new Error('Flutterwave configuration missing');
+      }
+
+      const params = new URLSearchParams();
+      params.append('grant_type', 'client_credentials');
+      params.append('client_id', clientId);
+      params.append('client_secret', clientSecret);
+
       const response = await this.axiosInstance.post<FlutterwaveAuthResponse>(
         authUrl,
-        new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: clientId,
-          client_secret: clientSecret,
-        }),
+        params,
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -99,6 +104,10 @@ export class FlutterwaveService {
   /** Verify webhook signature */
   private verifyWebhookSignature(payload: any, signature: string): boolean {
     const secretHash = this.config.get<string>('FLUTTERWAVE_WEBHOOK_SECRET_HASH');
+    if (!secretHash) {
+      this.logger.warn('Webhook secret hash not configured');
+      return false;
+    }
     const hash = crypto.createHmac('sha256', secretHash).update(JSON.stringify(payload)).digest('hex');
     return hash === signature;
   }
@@ -210,6 +219,7 @@ export class FlutterwaveService {
       const token = await this.authenticate();
       const reference = `ADAM-${transactionId}-${Date.now()}`;
 
+      const appUrl = this.config.get<string>('APP_URL');
       const transferPayload: FlutterwaveTransferPayload = {
         account_bank: bank_code,
         account_number: bank_account,
@@ -217,7 +227,7 @@ export class FlutterwaveService {
         narration,
         currency,
         reference,
-        callback_url: `${this.config.get('APP_URL')}/offramp/webhook`,
+        callback_url: appUrl ? `${appUrl}/offramp/webhook` : undefined,
       };
 
       const response = await this.axiosInstance.post(
@@ -240,7 +250,7 @@ export class FlutterwaveService {
       return response.data;
     } catch (error) {
       this.logger.error('Flutterwave transfer failed', error.response?.data || error.message);
-      
+
       await this.prisma.transaction.update({
         where: { id: transactionId },
         data: {
