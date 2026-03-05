@@ -24,11 +24,11 @@ async function main() {
     nodeUrl: env.STARKNET_RPC_URL!,
   });
 
-  const account = new Account(
+  const account = new Account({
     provider,
-    env.DEPLOYER_ADDRESS!,
-    env.DEPLOYER_PRIVATE_KEY!
-  );
+    address: env.DEPLOYER_ADDRESS!,
+    signer: env.DEPLOYER_PRIVATE_KEY!,
+  });
 
   const swapAddress = env.ADAM_SWAP_ADDRESS!;
   const backendWallet = env.DEPLOYER_ADDRESS!; // Backend uses deployer wallet
@@ -42,21 +42,13 @@ async function main() {
   console.log(`Role Hash: ${RATE_SETTER_ROLE}`);
 
   try {
-    // Get nonce manually using 'latest' block
-    const nonce = await provider.getNonceForAddress(env.DEPLOYER_ADDRESS!, 'latest');
-    console.log(`Using nonce: ${nonce}`);
-
-    const { transaction_hash } = await account.execute(
-      [
-        {
-          contractAddress: swapAddress,
-          entrypoint: 'grant_role',
-          calldata: [RATE_SETTER_ROLE, backendWallet],
-        },
-      ],
-      undefined,
-      { nonce, skipValidate: false }
-    );
+    const { transaction_hash } = await account.execute([
+      {
+        contractAddress: swapAddress,
+        entrypoint: 'grant_role',
+        calldata: [RATE_SETTER_ROLE, backendWallet],
+      },
+    ]);
 
     console.log(`Transaction submitted: ${transaction_hash}`);
     await provider.waitForTransaction(transaction_hash);

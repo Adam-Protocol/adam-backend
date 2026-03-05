@@ -23,11 +23,11 @@ async function main() {
     nodeUrl: env.STARKNET_RPC_URL!,
   });
 
-  const account = new Account(
+  const account = new Account({
     provider,
-    env.DEPLOYER_ADDRESS!,
-    env.DEPLOYER_PRIVATE_KEY!,
-  );
+    address: env.DEPLOYER_ADDRESS!,
+    signer: env.DEPLOYER_PRIVATE_KEY!,
+  });
 
   const adusdAddress = env.ADUSD_ADDRESS!;
   const adngnAddress = env.ADNGN_ADDRESS!;
@@ -46,10 +46,10 @@ async function main() {
   const swapAbi = await provider.getClassAt(swapAddress);
   const poolAbi = await provider.getClassAt(poolAddress);
 
-  const adusd = new Contract(adusdAbi.abi, adusdAddress, provider);
-  const adngn = new Contract(adusdAbi.abi, adngnAddress, provider);
-  const swap = new Contract(swapAbi.abi, swapAddress, provider);
-  const pool = new Contract(poolAbi.abi, poolAddress, provider);
+  const adusd = new Contract({ abi: adusdAbi.abi, address: adusdAddress, providerOrAccount: provider });
+  const adngn = new Contract({ abi: adusdAbi.abi, address: adngnAddress, providerOrAccount: provider });
+  const swap = new Contract({ abi: swapAbi.abi, address: swapAddress, providerOrAccount: provider });
+  const pool = new Contract({ abi: poolAbi.abi, address: poolAddress, providerOrAccount: provider });
 
   // Check ADUSD roles
   console.log('ADUSD Token:');
