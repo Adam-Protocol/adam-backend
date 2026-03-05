@@ -86,7 +86,39 @@ Get the live USD/NGN rate (cached, refreshed every 5 min).
 **Response** `200`
 
 ```json
-{ "usd_ngn": 1612.45, "updated_at": "2026-02-22T20:00:00.000Z" }
+{ "usd_ngn": 1612.45, "updated_at": "2026-02-22T20:00:00.000Z", "source": "exchange_rate_api" }
+```
+
+---
+
+### `GET /swap/rate/source`
+
+Get the current default rate source.
+
+**Response** `200`
+
+```json
+{ "source": "exchange_rate_api" }
+```
+
+---
+
+### `PUT /swap/rate/source`
+
+Set the default rate source for exchange rates.
+
+**Body**
+
+```json
+{ "source": "exchange_rate_api" }
+```
+
+Valid sources: `exchange_rate_api`, `flutterwave`
+
+**Response** `200`
+
+```json
+{ "source": "flutterwave", "message": "Default rate source set to flutterwave" }
 ```
 
 ---
@@ -95,7 +127,7 @@ Get the live USD/NGN rate (cached, refreshed every 5 min).
 
 ### `GET /offramp/status/:referenceId`
 
-Check status of a bank transfer by its Monnify reference ID.
+Check status of a bank transfer by its Flutterwave reference ID.
 
 **Response** `200`
 
@@ -116,11 +148,13 @@ Check status of a bank transfer by its Monnify reference ID.
 
 ### `POST /offramp/webhook`
 
-Monnify payment webhook (internal — not for client use).
+Flutterwave payment webhook (internal — not for client use).
 
-**Body**: Raw Monnify webhook payload including `transactionReference` and `paymentStatus`.
+**Headers**: `verif-hash` - Flutterwave webhook signature
 
-**Response** `200` `{ "received": true }`
+**Body**: Raw Flutterwave webhook payload including event type and data.
+
+**Response** `200` `{ "status": "success" }`
 
 ---
 

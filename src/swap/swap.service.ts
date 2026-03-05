@@ -5,36 +5,95 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
+import { FlutterwaveService } from '../offramp/flutterwave.service';
 import { SwapDto } from './swap.dto';
+import { RateSource } from './rate-source.enum';
 
 @Injectable()
 export class SwapService {
   private readonly logger = new Logger(SwapService.name);
-  private cachedRate: { usd_ngn: number; updated_at: Date } | null = null;
+  private cachedRate: { usd_ngn: number; updated_at: Date; source: RateSource } | null = null;
+  private defaultRateSource: RateSource = RateSource.EXCHANGE_RATE_API;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly flutterwave: FlutterwaveService,
     @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
   ) {}
 
-  /** Get live USD/NGN rate from cache or ExchangeRate-API */
-  async getLiveRate(): Promise<{ usd_ngn: number; updated_at: Date | null }> {
+  /** Get current default rate source */
+  getDefaultRateSource(): RateSource {
+    return this.defaultRateSource;
+  }
+
+  /** Set default rate source */
+  setDefaultRateSource(source: RateSource): { source: RateSource; message: string } {
+    if (!Object.values(RateSource).includes(source)) {
+      throw new Error(`Invalid rate source. Must be one of: ${Object.values(RateSource).join(', ')}`);
+    }
+    this.defaultRateSource = source;
+    this.logger.log(`Default rate source changed to: ${source}`);
+    return {
+      source: this.defaultRateSource,
+      message: `Default rate source set to ${source}`,
+    };
+  }
+
+  /** Get live USD/NGN rate from cache or fetch from source */
+  async getLiveRate(): Promise<{ usd_ngn: number; updated_at: Date | null; source: RateSource }> {
     if (this.cachedRate) {
-      return { usd_ngn: this.cachedRate.usd_ngn, updated_at: this.cachedRate.updated_at };
+      return {
+        usd_ngn: this.cachedRate.usd_ngn,
+        updated_at: this.cachedRate.updated_at,
+        source: this.cachedRate.source,
+      };
     }
     return this.refreshRate();
   }
 
-  /** Refresh rate from ExchangeRate-API and enqueue on-chain set_rate call */
+  /** Fetch rate from ExchangeRate-API */
+  private async fetchFromExchangeRateApi(): Promise<number> {
+    const key = this.config.get<string>('EXCHANGE_RATE_API_KEY');
+    const url = `${this.config.get('EXCHANGE_RATE_API_URL')}/${key}/latest/USD`;
+    const { data } = await axios.get(url);
+    return data.conversion_rates.NGN;
+  }
+
+  /** Fetch rate from Flutterwave */
+  private async fetchFromFlutterwave(): Promise<number> {
+    return this.flutterwave.getExchangeRate('USD', 'NGN', 1);
+  }
+
+  /** Refresh rate from configured source and enqueue on-chain set_rate call */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async refreshRate() {
     try {
-      const key = this.config.get<string>('EXCHANGE_RATE_API_KEY');
-      const url = `${this.config.get('EXCHANGE_RATE_API_URL')}/${key}/latest/USD`;
-      const { data } = await axios.get(url);
-      const usd_ngn: number = data.conversion_rates.NGN;
-      this.cachedRate = { usd_ngn, updated_at: new Date() };
+      let usd_ngn: number;
+      let source: RateSource;
+
+      // Fetch from default source
+      if (this.defaultRateSource === RateSource.FLUTTERWAVE) {
+        try {
+          usd_ngn = await this.fetchFromFlutterwave();
+          source = RateSource.FLUTTERWAVE;
+        } catch (err) {
+          this.logger.warn('Flutterwave rate fetch failed, falling back to ExchangeRate-API');
+          usd_ngn = await this.fetchFromExchangeRateApi();
+          source = RateSource.EXCHANGE_RATE_API;
+        }
+      } else {
+        try {
+          usd_ngn = await this.fetchFromExchangeRateApi();
+          source = RateSource.EXCHANGE_RATE_API;
+        } catch (err) {
+          this.logger.warn('ExchangeRate-API fetch failed, falling back to Flutterwave');
+          usd_ngn = await this.fetchFromFlutterwave();
+          source = RateSource.FLUTTERWAVE;
+        }
+      }
+
+      this.cachedRate = { usd_ngn, updated_at: new Date(), source };
 
       // Push rate on-chain via queue (RATE_SETTER_ROLE backend wallet)
       await this.chainTxQueue.add(
@@ -43,11 +102,15 @@ export class SwapService {
         { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
       );
 
-      this.logger.log(`Rate refreshed: 1 USD = ${usd_ngn} NGN`);
-      return { usd_ngn, updated_at: this.cachedRate.updated_at };
+      this.logger.log(`Rate refreshed from ${source}: 1 USD = ${usd_ngn} NGN`);
+      return { usd_ngn, updated_at: this.cachedRate.updated_at, source };
     } catch (err) {
-      this.logger.error('Rate refresh failed', err);
-      return { usd_ngn: this.cachedRate?.usd_ngn ?? 0, updated_at: this.cachedRate?.updated_at ?? null };
+      this.logger.error('Rate refresh failed from all sources', err);
+      return {
+        usd_ngn: this.cachedRate?.usd_ngn ?? 0,
+        updated_at: this.cachedRate?.updated_at ?? null,
+        source: this.cachedRate?.source ?? this.defaultRateSource,
+      };
     }
   }
 

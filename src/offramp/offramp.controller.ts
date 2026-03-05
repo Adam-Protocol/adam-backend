@@ -1,23 +1,26 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
-import { OfframpService } from './offramp.service';
+import { FlutterwaveService } from './flutterwave.service';
 
 @ApiTags('offramp')
 @Controller('offramp')
 export class OfframpController {
-  constructor(private readonly offrampService: OfframpService) {}
+  constructor(private readonly flutterwaveService: FlutterwaveService) {}
 
   @Get('status/:referenceId')
   @ApiOperation({ summary: 'Get offramp transaction status' })
-  @ApiParam({ name: 'referenceId', description: 'Monnify reference ID' })
+  @ApiParam({ name: 'referenceId', description: 'Flutterwave reference ID' })
   getStatus(@Param('referenceId') referenceId: string) {
-    return this.offrampService.getStatus(referenceId);
+    return this.flutterwaveService.getStatus(referenceId);
   }
 
   @Post('webhook')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Monnify payment webhook (internal)' })
-  handleWebhook(@Body() payload: any) {
-    return this.offrampService.handleWebhook(payload);
+  @ApiOperation({ summary: 'Flutterwave payment webhook (internal)' })
+  handleWebhook(
+    @Body() payload: any,
+    @Headers('verif-hash') signature: string,
+  ) {
+    return this.flutterwaveService.handleWebhook(payload, signature);
   }
 }

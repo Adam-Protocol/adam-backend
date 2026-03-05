@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { OfframpController } from './offramp.controller';
-import { OfframpService } from './offramp.service';
+import { FlutterwaveService } from './flutterwave.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: 'offramp' })],
   controllers: [OfframpController],
-  providers: [OfframpService],
-  exports: [OfframpService],
+  providers: [FlutterwaveService],
+  exports: [FlutterwaveService],
 })
 export class OfframpModule {}

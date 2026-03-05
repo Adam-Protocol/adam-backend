@@ -4,7 +4,7 @@ import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { StarknetService } from '../starknet/starknet.service';
-import { OfframpService } from '../offramp/offramp.service';
+import { FlutterwaveService } from '../offramp/flutterwave.service';
 import { uint256 } from 'starknet';
 
 @Processor('chain-tx')
@@ -15,7 +15,7 @@ export class ChainTxProcessor extends WorkerHost {
     private readonly starknet: StarknetService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly offramp: OfframpService,
+    private readonly flutterwave: FlutterwaveService,
   ) {
     super();
   }
@@ -112,10 +112,10 @@ export class ChainTxProcessor extends WorkerHost {
         data: { tx_hash: txHash },
       });
 
-      // Trigger bank transfer
+      // Trigger bank transfer via Flutterwave
       const tx = await this.prisma.transaction.findUnique({ where: { id: transactionId } });
       if (tx?.bank_account && tx?.bank_code) {
-        await this.offramp.initiateBankTransfer({
+        await this.flutterwave.initiateBankTransfer({
           transactionId,
           amount: Number(amount) / 1e18, // assumes 18 decimals
           currency: tx.currency ?? 'NGN',
