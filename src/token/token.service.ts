@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { StarknetService } from '../starknet/starknet.service';
 import { BuyTokenDto, SellTokenDto } from './token.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class TokenService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly starknet: StarknetService,
     @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
   ) {}
 
@@ -100,5 +102,45 @@ export class TokenService {
 
     this.logger.log(`Sell job ${job.id} enqueued for wallet ${dto.wallet}`);
     return { job_id: job.id, transaction_id: tx.id, status: 'pending' };
+  }
+
+  /** Get token balances for a wallet */
+  async getBalances(wallet: string) {
+    try {
+      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
+      const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
+
+      if (!adusdAddress || !adngnAddress) {
+        throw new Error('Token addresses not configured');
+      }
+
+      const [adusdBalance, adngnBalance] = await Promise.all([
+        this.starknet.getBalance(adusdAddress, wallet),
+        this.starknet.getBalance(adngnAddress, wallet),
+      ]);
+
+      // Both ADUSD and ADNGN have 18 decimals
+      const adusdFormatted = Number(adusdBalance) / 1e18;
+      const adngnFormatted = Number(adngnBalance) / 1e18;
+
+      return {
+        wallet,
+        balances: {
+          adusd: {
+            raw: adusdBalance.toString(),
+            formatted: adusdFormatted.toFixed(2),
+            decimals: 18,
+          },
+          adngn: {
+            raw: adngnBalance.toString(),
+            formatted: adngnFormatted.toFixed(2),
+            decimals: 18,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to fetch balances for ${wallet}`, error);
+      throw error;
+    }
   }
 }

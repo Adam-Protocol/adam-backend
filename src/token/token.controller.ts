@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TokenService } from './token.service';
 import { BuyTokenDto, SellTokenDto } from './token.dto';
@@ -22,5 +22,12 @@ export class TokenController {
   @ApiResponse({ status: 202, description: 'Sell job enqueued' })
   sell(@Body() dto: SellTokenDto) {
     return this.tokenService.sell(dto);
+  }
+
+  @Get('balances/:wallet')
+  @ApiOperation({ summary: 'Get token balances for a wallet' })
+  @ApiResponse({ status: 200, description: 'Returns ADUSD and ADNGN balances' })
+  getBalances(@Param('wallet') wallet: string) {
+    return this.tokenService.getBalances(wallet);
   }
 }
