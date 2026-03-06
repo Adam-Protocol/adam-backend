@@ -16,8 +16,8 @@ model Transaction {
   id           String   @id @default(uuid())
   wallet       String   // Starknet wallet address
   type         String   // buy | sell | swap
-  commitment   String   @unique
-  nullifier    String?
+  commitment   String   // Commitment hash (can be reused across buy/sell)
+  nullifier    String?  @unique // Nullifier prevents double-spending
   token_in     String   // Contract address or symbol
   token_out    String
   status       String   @default("pending") // pending | processing | completed | failed
@@ -33,4 +33,5 @@ model Transaction {
   @@index([wallet])
   @@index([commitment])
   @@index([status])
+  @@index([nullifier])
 }
