@@ -1,7 +1,12 @@
-import { IsIn, IsNumberString, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SwapDto {
+  @ApiPropertyOptional({ description: 'Custom transaction ID (optional)', example: 'tx_abc123' })
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
+
   @ApiProperty({ example: '0x049...' })
   @IsString()
   wallet: string;

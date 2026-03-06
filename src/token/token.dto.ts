@@ -2,6 +2,11 @@ import { IsEthereumAddress, IsIn, IsNumberString, IsOptional, IsString, Length }
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BuyTokenDto {
+  @ApiPropertyOptional({ description: 'Custom transaction ID (optional)', example: 'tx_abc123' })
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
+
   @ApiProperty({ description: 'Starknet wallet address', example: '0x049...' })
   @IsString()
   wallet: string;
@@ -17,9 +22,19 @@ export class BuyTokenDto {
   @ApiProperty({ description: 'Pedersen commitment hash (computed client-side)', example: '0x...' })
   @IsString()
   commitment: string;
+
+  @ApiPropertyOptional({ description: 'Transaction hash (if already executed on frontend)', example: '0x...' })
+  @IsOptional()
+  @IsString()
+  tx_hash?: string;
 }
 
 export class SellTokenDto {
+  @ApiPropertyOptional({ description: 'Custom transaction ID (optional)', example: 'tx_abc123' })
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
+
   @ApiProperty({ description: 'Starknet wallet address', example: '0x049...' })
   @IsString()
   wallet: string;

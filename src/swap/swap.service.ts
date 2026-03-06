@@ -116,22 +116,29 @@ export class SwapService {
 
   /** Enqueue a swap job */
   async swap(dto: SwapDto) {
+    // Use custom transactionId if provided, otherwise let Prisma generate one
+    const txData: any = {
+      wallet: dto.wallet,
+      type: 'swap',
+      commitment: dto.commitment,
+      token_in: dto.token_in.toUpperCase(),
+      token_out: dto.token_out.toUpperCase(),
+      status: 'pending',
+    };
+
+    if (dto.transactionId) {
+      txData.id = dto.transactionId;
+    }
+
     const tx = await this.prisma.transaction.create({
-      data: {
-        wallet: dto.wallet,
-        type: 'swap',
-        commitment: dto.commitment,
-        token_in: dto.token_in.toUpperCase(),
-        token_out: dto.token_out.toUpperCase(),
-        status: 'pending',
-      },
+      data: txData,
     });
 
     const job = await this.chainTxQueue.add(
       'submit-swap',
       {
         transactionId: tx.id,
-        wallet: dto.wallet,
+        walletAddress: dto.wallet,
         token_in: dto.token_in,
         amount_in: dto.amount_in,
         token_out: dto.token_out,
