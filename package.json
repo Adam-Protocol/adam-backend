@@ -21,6 +21,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "prisma:seed": "ts-node prisma/seed.ts",
     "grant-rate-setter": "bash src/scripts/grant-rate-setter.sh",
     "verify-roles": "bash src/scripts/verify-roles.sh",
     "grant-all-roles": "bash src/scripts/grant-all-roles.sh",
@@ -42,6 +43,7 @@
     "bullmq": "^5.0.0",
     "class-transformer": "^0.5.0",
     "class-validator": "^0.14.0",
+    "dotenv": "^17.3.1",
     "ioredis": "^5.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -89,5 +91,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }
