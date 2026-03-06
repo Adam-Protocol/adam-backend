@@ -25,6 +25,25 @@ interface FlutterwaveRateResponse {
   };
 }
 
+interface FlutterwaveBankListResponse {
+  status: string;
+  message: string;
+  data: Array<{
+    id: number;
+    code: string;
+    name: string;
+  }>;
+}
+
+interface FlutterwaveAccountVerificationResponse {
+  status: string;
+  message: string;
+  data: {
+    account_number: string;
+    account_name: string;
+  };
+}
+
 interface FlutterwaveTransferResponse {
   status: string;
   message: string;
@@ -293,6 +312,65 @@ export class FlutterwaveService {
     } catch (error) {
       this.logger.error('Failed to fetch Flutterwave exchange rate', error.response?.data || error.message);
       throw new Error('Failed to fetch exchange rate from Flutterwave');
+    }
+  }
+
+  /** Get list of banks for a specific country */
+  async getBanks(country: string = 'NG') {
+    try {
+      const apiKey = this.getApiKey();
+
+      const response = await this.axiosInstance.get<FlutterwaveBankListResponse>(
+        '/banks/' + country,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        },
+      );
+
+      if (response.data.status !== 'success') {
+        throw new Error(response.data.message || 'Failed to fetch banks');
+      }
+
+      this.logger.log(`Fetched ${response.data.data.length} banks for ${country}`);
+      return response.data.data;
+    } catch (error) {
+      this.logger.error('Failed to fetch banks', error.response?.data || error.message);
+      throw new Error('Failed to fetch banks from Flutterwave');
+    }
+  }
+
+  /** Verify bank account and get account name */
+  async verifyAccount(accountNumber: string, bankCode: string) {
+    try {
+      const apiKey = this.getApiKey();
+
+      const response = await this.axiosInstance.post<FlutterwaveAccountVerificationResponse>(
+        '/accounts/resolve',
+        {
+          account_number: accountNumber,
+          account_bank: bankCode,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        },
+      );
+
+      if (response.data.status !== 'success') {
+        throw new Error(response.data.message || 'Account verification failed');
+      }
+
+      this.logger.log(`Account verified: ${response.data.data.account_name}`);
+      return {
+        account_number: response.data.data.account_number,
+        account_name: response.data.data.account_name,
+      };
+    } catch (error) {
+      this.logger.error('Account verification failed', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Failed to verify account');
     }
   }
 }
