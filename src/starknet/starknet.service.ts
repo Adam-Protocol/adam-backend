@@ -68,7 +68,11 @@ export class StarknetService {
   async execute(calls: any[]): Promise<string> {
     try {
       // Execute transaction with proper v9.2.1 signature
-      const { transaction_hash } = await this.deployerAccount.execute(calls);
+      const { transaction_hash } = await this.deployerAccount.execute(calls, {
+        version: 3,
+        tip: 10 ** 13,
+        paymasterData: [],
+      });
 
       await this.provider.waitForTransaction(transaction_hash);
       return transaction_hash;

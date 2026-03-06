@@ -28,7 +28,7 @@ export class TransactionService {
   }
 
   async findByCommitment(commitment: string): Promise<Transaction | null> {
-    return this.prisma.transaction.findUnique({ where: { commitment } });
+    return this.prisma.transaction.findFirst({ where: { commitment } });
   }
 
   async findByNullifier(nullifier: string): Promise<Transaction | null> {

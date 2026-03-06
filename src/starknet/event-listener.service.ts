@@ -142,8 +142,8 @@ export class EventListenerService implements OnModuleInit {
     const commitment = event.data[0];
     const txHash = event.transaction_hash;
 
-    const tx = await this.prisma.transaction.findUnique({
-      where: { commitment },
+    const tx = await this.prisma.transaction.findFirst({
+      where: { commitment, type: 'buy' },
     });
 
     if (tx && tx.status !== 'completed') {
@@ -184,8 +184,8 @@ export class EventListenerService implements OnModuleInit {
     const commitment = event.data[0];
     const txHash = event.transaction_hash;
 
-    const tx = await this.prisma.transaction.findUnique({
-      where: { commitment },
+    const tx = await this.prisma.transaction.findFirst({
+      where: { commitment, type: 'swap' },
     });
 
     if (tx && tx.status !== 'completed') {
