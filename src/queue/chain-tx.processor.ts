@@ -38,6 +38,7 @@ export class ChainTxProcessor extends WorkerHost {
   }
 
   private async processBuy(data: any) {
+    console.log("data", data);
     const { transactionId, amount_in, token_out, commitment } = data;
 
     try {
@@ -52,22 +53,19 @@ export class ChainTxProcessor extends WorkerHost {
       const usdcAddress = this.config.get<string>('USDC_ADDRESS');
       const tokenOutAddress = token_out === 'adusd' ? adusdAddress : adngnAddress;
 
-      const amountU256 = uint256.bnToUint256(BigInt(amount_in));
+      const amountU256 = uint256.bnToUint256(amount_in);
+      console.log("amount", amountU256);
 
+      // Approval is now done in the frontend, so we only execute the buy
       const txHash = await this.starknet.execute([
-        // First approve USDC spend
-        {
-          contractAddress: usdcAddress,
-          entrypoint: 'approve',
-          calldata: [swapAddress, amountU256.low.toString(), amountU256.high.toString()],
-        },
-        // Then buy
         {
           contractAddress: swapAddress,
           entrypoint: 'buy',
-          calldata: [usdcAddress, amountU256.low.toString(), amountU256.high.toString(), tokenOutAddress, commitment],
+          calldata: [usdcAddress, amountU256, tokenOutAddress, commitment],
         },
       ]);
+
+      console.log("txHash", txHash)
 
       await this.prisma.transaction.update({
         where: { id: transactionId },
@@ -76,6 +74,7 @@ export class ChainTxProcessor extends WorkerHost {
 
       this.logger.log(`Buy completed: ${txHash}`);
     } catch (err) {
+      // For errors, mark as failed and allow retry
       await this.prisma.transaction.update({
         where: { id: transactionId },
         data: { status: 'failed', error: err.message },
