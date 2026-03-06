@@ -107,9 +107,22 @@ export class StarknetService {
   /** Get account balance */
   async getBalance(tokenAddress: string, accountAddress: string): Promise<bigint> {
     try {
-      const contract = await this.getContract(tokenAddress);
-      const balance = await contract.balanceOf(accountAddress);
-      return BigInt(balance.balance.low) + (BigInt(balance.balance.high) << 128n);
+      // Use provider for read-only operations
+      const { abi } = await this.provider.getClassAt(tokenAddress);
+      const contract = new Contract({ abi, address: tokenAddress, providerOrAccount: this.provider });
+      const result = await contract.balanceOf(accountAddress);
+      
+      // If result is already a BigInt, return it directly
+      if (typeof result === 'bigint') {
+        return result;
+      }
+      
+      // Handle u256 struct response
+      const balance = result.balance || result;
+      const low = BigInt(balance.low || balance[0] || 0);
+      const high = BigInt(balance.high || balance[1] || 0);
+      
+      return low + (high << 128n);
     } catch (error) {
       this.logger.error(`Failed to get balance for ${accountAddress}`, error);
       throw error;
