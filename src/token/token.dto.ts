@@ -67,4 +67,9 @@ export class SellTokenDto {
   @ApiProperty({ description: 'Bank code', example: '044' })
   @IsString()
   bank_code: string;
+
+  @ApiPropertyOptional({ description: 'Transaction hash (if already executed on frontend)', example: '0x...' })
+  @IsOptional()
+  @IsString()
+  tx_hash?: string;
 }
