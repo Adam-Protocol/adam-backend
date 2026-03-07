@@ -30,4 +30,9 @@ export class SwapDto {
   @ApiProperty({ description: 'Commitment hash (computed client-side)', example: '0x...' })
   @IsString()
   commitment: string;
+
+  @ApiPropertyOptional({ description: 'Transaction hash from frontend execution', example: '0x...' })
+  @IsOptional()
+  @IsString()
+  tx_hash?: string;
 }

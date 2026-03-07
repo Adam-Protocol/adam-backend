@@ -11,7 +11,7 @@ export class SwapController {
 
   @Post()
   @HttpCode(202)
-  @ApiOperation({ summary: 'Swap ADUSD <-> ADNGN' })
+  @ApiOperation({ summary: 'Record swap transaction (execution happens on frontend)' })
   swap(@Body() dto: SwapDto) {
     return this.swapService.swap(dto);
   }
