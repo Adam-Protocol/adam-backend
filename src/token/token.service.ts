@@ -54,7 +54,7 @@ export class TokenService {
     return { transaction_id: tx.id, status: tx.status, tx_hash: tx.tx_hash };
   }
 
-  /** Initiate a sell: validate nullifier then enqueue async */
+  /** Initiate a sell: validate nullifier then trigger bank transfer */
   async sell(dto: SellTokenDto) {
     const existing = await this.prisma.transaction.findFirst({
       where: { nullifier: dto.nullifier },
@@ -71,7 +71,8 @@ export class TokenService {
       nullifier: dto.nullifier,
       token_in: dto.token_in.toUpperCase(),
       token_out: 'FIAT',
-      status: 'pending',
+      status: dto.tx_hash ? 'completed' : 'pending',
+      tx_hash: dto.tx_hash || null,
       currency: dto.currency,
       bank_account: dto.bank_account,
       bank_code: dto.bank_code,
@@ -85,25 +86,29 @@ export class TokenService {
       data: txData,
     });
 
-    const job = await this.chainTxQueue.add(
-      'submit-sell',
-      {
-        transactionId: tx.id,
-        walletAddress: dto.wallet,
-        token_in: dto.token_in,
-        amount: dto.amount,
-        nullifier: dto.nullifier,
-        commitment: dto.commitment,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: true,
-      },
-    );
+    // If transaction hash is provided, trigger bank transfer immediately
+    if (dto.tx_hash && dto.bank_account && dto.bank_code) {
+      const job = await this.chainTxQueue.add(
+        'process-bank-transfer',
+        {
+          transactionId: tx.id,
+          amount: dto.amount,
+          currency: dto.currency,
+          bank_account: dto.bank_account,
+          bank_code: dto.bank_code,
+          token_in: dto.token_in,
+        },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 },
+          removeOnComplete: true,
+        },
+      );
+      this.logger.log(`Bank transfer job ${job.id} enqueued for transaction ${tx.id}`);
+    }
 
-    this.logger.log(`Sell job ${job.id} enqueued for wallet ${dto.wallet}`);
-    return { job_id: job.id, transaction_id: tx.id, status: 'pending' };
+    this.logger.log(`Sell transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`);
+    return { transaction_id: tx.id, status: tx.status, tx_hash: tx.tx_hash };
   }
 
   /** Get token balances for a wallet */
