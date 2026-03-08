@@ -1,6 +1,6 @@
 /**
  * Grant RATE_SETTER_ROLE to backend wallet
- * 
+ *
  * Run this script once after deployment:
  * npx ts-node -r tsconfig-paths/register src/scripts/grant-rate-setter-role.ts
  */
@@ -21,17 +21,17 @@ envContent.split('\n').forEach((line) => {
 
 async function main() {
   const provider = new RpcProvider({
-    nodeUrl: env.STARKNET_RPC_URL!,
+    nodeUrl: env.STARKNET_RPC_URL,
   });
 
   const account = new Account({
     provider,
-    address: env.DEPLOYER_ADDRESS!,
-    signer: env.DEPLOYER_PRIVATE_KEY!,
+    address: env.DEPLOYER_ADDRESS,
+    signer: env.DEPLOYER_PRIVATE_KEY,
   });
 
-  const swapAddress = env.ADAM_SWAP_ADDRESS!;
-  const backendWallet = env.DEPLOYER_ADDRESS!; // Backend uses deployer wallet
+  const swapAddress = env.ADAM_SWAP_ADDRESS;
+  const backendWallet = env.DEPLOYER_ADDRESS; // Backend uses deployer wallet
 
   // Calculate RATE_SETTER_ROLE hash
   const RATE_SETTER_ROLE = hash.getSelectorFromName('RATE_SETTER_ROLE');
@@ -53,8 +53,11 @@ async function main() {
     console.log(`Transaction submitted: ${transaction_hash}`);
     await provider.waitForTransaction(transaction_hash);
     console.log('✅ RATE_SETTER_ROLE granted successfully!');
-  } catch (error: any) {
-    if (error.message?.includes('already granted') || error.message?.includes('already has role')) {
+  } catch (error: unknown) {
+    if (
+      (error as { message?: string }).message?.includes('already granted') ||
+      (error as { message?: string }).message?.includes('already has role')
+    ) {
       console.log('✅ RATE_SETTER_ROLE already granted!');
     } else {
       throw error;

@@ -3,7 +3,8 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const RECIPIENT = '0x04073e73e3020c886d14f35ac20a7694c69768eb8f6d28d8b0d228b7b89b9327';
+const RECIPIENT =
+  '0x04073e73e3020c886d14f35ac20a7694c69768eb8f6d28d8b0d228b7b89b9327';
 const AMOUNT_ADNGN = 1_000_000n * 100n; // 1M ADNGN (2 decimals)
 const AMOUNT_ADUSD = 1_000_000n * 1_000_000n; // 1M ADUSD (6 decimals)
 
@@ -56,7 +57,12 @@ async function main() {
   try {
     // Mint ADUSD
     console.log('Minting ADUSD...');
-    const adusdTx = await adusdContract.mint(RECIPIENT, adusdAmount);
+    const adusdTx = (await adusdContract.call('mint', [
+      RECIPIENT,
+      adusdAmount,
+    ])) as {
+      transaction_hash: string;
+    };
     console.log(`ADUSD mint tx: ${adusdTx.transaction_hash}`);
     await provider.waitForTransaction(adusdTx.transaction_hash);
     console.log('✅ ADUSD minted successfully!');
@@ -64,7 +70,12 @@ async function main() {
 
     // Mint ADNGN
     console.log('Minting ADNGN...');
-    const adngnTx = await adngnContract.mint(RECIPIENT, adngnAmount);
+    const adngnTx = (await adngnContract.call('mint', [
+      RECIPIENT,
+      adngnAmount,
+    ])) as {
+      transaction_hash: string;
+    };
     console.log(`ADNGN mint tx: ${adngnTx.transaction_hash}`);
     await provider.waitForTransaction(adngnTx.transaction_hash);
     console.log('✅ ADNGN minted successfully!');
@@ -80,4 +91,7 @@ async function main() {
   }
 }
 
-main();
+main().catch((err) => {
+  console.error('Failed to mint tokens:', err);
+  process.exit(1);
+});

@@ -10,11 +10,13 @@ const RATE_PRECISION = BigInt('1000000000000000000'); // 1e18
 // To convert 1 USDC (1e6) to 1385.81 ADNGN (1385.81e18), we need to multiply by 1385.81 * 1e12
 // Rate = 1385.81 * 1e18 * 1e12 = 1385.81e30
 const USD_TO_NGN_RATE = 1385.81;
-const USDC_TO_ADNGN_RATE = BigInt(Math.floor(USD_TO_NGN_RATE * 1e12)) * RATE_PRECISION; // 1385.81 * 1e30
+const USDC_TO_ADNGN_RATE =
+  BigInt(Math.floor(USD_TO_NGN_RATE * 1e12)) * RATE_PRECISION; // 1385.81 * 1e30
 
 // To convert 1 ADNGN (1e18) to USDC (1e6), we need to divide by 1385.81 * 1e12
 // Rate = 1e18 / (1385.81 * 1e12) = 1e6 / 1385.81
-const ADNGN_TO_USDC_RATE = RATE_PRECISION / BigInt(Math.floor(USD_TO_NGN_RATE * 1e12)); // 1e6 / 1385.81
+const ADNGN_TO_USDC_RATE =
+  RATE_PRECISION / BigInt(Math.floor(USD_TO_NGN_RATE * 1e12)); // 1e6 / 1385.81
 
 async function setUsdcAdngnRate() {
   const provider = new RpcProvider({
@@ -48,7 +50,9 @@ async function setUsdcAdngnRate() {
         calldata: [
           usdcAddress,
           adngnAddress,
-          (USDC_TO_ADNGN_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')).toString(), // low part
+          (
+            USDC_TO_ADNGN_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+          ).toString(), // low part
           (USDC_TO_ADNGN_RATE >> BigInt(128)).toString(), // high part
         ],
       },
@@ -66,7 +70,9 @@ async function setUsdcAdngnRate() {
         calldata: [
           adngnAddress,
           usdcAddress,
-          (ADNGN_TO_USDC_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')).toString(), // low part
+          (
+            ADNGN_TO_USDC_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+          ).toString(), // low part
           (ADNGN_TO_USDC_RATE >> BigInt(128)).toString(), // high part
         ],
       },

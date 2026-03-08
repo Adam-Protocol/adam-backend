@@ -29,7 +29,9 @@ async function setUsdcAdusdRate() {
   const usdcAddress = process.env.USDC_ADDRESS!;
   const adusdAddress = process.env.ADUSD_ADDRESS!;
 
-  console.log('Setting USDC <-> ADUSD rate (accounting for decimal difference)');
+  console.log(
+    'Setting USDC <-> ADUSD rate (accounting for decimal difference)',
+  );
   console.log('USDC decimals: 6, ADUSD decimals: 18');
   console.log('Swap contract:', swapAddress);
   console.log('USDC address:', usdcAddress);
@@ -46,7 +48,9 @@ async function setUsdcAdusdRate() {
         calldata: [
           usdcAddress,
           adusdAddress,
-          (USDC_TO_ADUSD_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')).toString(), // low part
+          (
+            USDC_TO_ADUSD_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+          ).toString(), // low part
           (USDC_TO_ADUSD_RATE >> BigInt(128)).toString(), // high part
         ],
       },
@@ -64,7 +68,9 @@ async function setUsdcAdusdRate() {
         calldata: [
           adusdAddress,
           usdcAddress,
-          (ADUSD_TO_USDC_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')).toString(), // low part
+          (
+            ADUSD_TO_USDC_RATE & BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+          ).toString(), // low part
           (ADUSD_TO_USDC_RATE >> BigInt(128)).toString(), // high part
         ],
       },
@@ -74,7 +80,9 @@ async function setUsdcAdusdRate() {
     await provider.waitForTransaction(tx2);
     console.log('✅ ADUSD -> USDC rate set successfully!');
 
-    console.log('\n✅ All rates set correctly (accounting for 6 vs 18 decimal difference)');
+    console.log(
+      '\n✅ All rates set correctly (accounting for 6 vs 18 decimal difference)',
+    );
   } catch (error) {
     console.error('❌ Error setting rates:', error);
     throw error;

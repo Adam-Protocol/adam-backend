@@ -82,8 +82,11 @@ async function grantSwapRoles() {
     console.log('✅ BURNER_ROLE granted on ADNGN');
 
     console.log('\n✅ All roles granted successfully!');
-  } catch (error: any) {
-    if (error.message?.includes('already granted') || error.message?.includes('already has role')) {
+  } catch (error: unknown) {
+    if (
+      (error as { message?: string }).message?.includes('already granted') ||
+      (error as { message?: string }).message?.includes('already has role')
+    ) {
       console.log('✅ Roles already granted!');
     } else {
       console.error('❌ Error granting roles:', error);
