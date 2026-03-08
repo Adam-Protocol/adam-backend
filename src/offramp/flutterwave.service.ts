@@ -119,18 +119,29 @@ export class FlutterwaveService {
   }
 
   /** Verify webhook signature */
-  private verifyWebhookSignature(payload: any, signature: string): boolean {
-    const secretHash = this.config.get<string>('FLUTTERWAVE_WEBHOOK_SECRET_HASH');
+  private verifyWebhookSignature(
+    payload: Record<string, unknown>,
+    signature: string,
+  ): boolean {
+    const secretHash = this.config.get<string>(
+      'FLUTTERWAVE_WEBHOOK_SECRET_HASH',
+    );
     if (!secretHash) {
       this.logger.warn('Webhook secret hash not configured');
       return false;
     }
-    const hash = crypto.createHmac('sha256', secretHash).update(JSON.stringify(payload)).digest('hex');
+    const hash = crypto
+      .createHmac('sha256', secretHash)
+      .update(JSON.stringify(payload))
+      .digest('hex');
     return hash === signature;
   }
 
   /** Handle Flutterwave webhook */
-  async handleWebhook(payload: any, signature: string) {
+  async handleWebhook(
+    payload: { event: string; data: Record<string, unknown> },
+    signature: string,
+  ) {
     this.logger.log(`Flutterwave webhook received: ${payload.event}`);
 
     // Verify webhook signature
@@ -155,8 +166,8 @@ export class FlutterwaveService {
     }
   }
 
-  private async handleTransferCompleted(data: any) {
-    const reference = data.reference;
+  private async handleTransferCompleted(data: Record<string, unknown>) {
+    const reference = data.reference as string;
     const tx = await this.prisma.transaction.findFirst({
       where: { reference_id: reference },
     });
@@ -175,8 +186,8 @@ export class FlutterwaveService {
     return { status: 'success' };
   }
 
-  private async handleTransferFailed(data: any) {
-    const reference = data.reference;
+  private async handleTransferFailed(data: Record<string, unknown>) {
+    const reference = data.reference as string;
     const tx = await this.prisma.transaction.findFirst({
       where: { reference_id: reference },
     });
@@ -190,16 +201,18 @@ export class FlutterwaveService {
       where: { id: tx.id },
       data: {
         status: 'failed',
-        error: data.complete_message || 'Transfer failed',
+        error: (data.complete_message as string) || 'Transfer failed',
       },
     });
 
-    this.logger.log(`Transaction ${tx.id} failed: ${data.complete_message}`);
+    this.logger.log(
+      `Transaction ${tx.id} failed: ${data.complete_message as string}`,
+    );
     return { status: 'success' };
   }
 
-  private async handleTransferReversed(data: any) {
-    const reference = data.reference;
+  private async handleTransferReversed(data: Record<string, unknown>) {
+    const reference = data.reference as string;
     const tx = await this.prisma.transaction.findFirst({
       where: { reference_id: reference },
     });
@@ -230,7 +243,14 @@ export class FlutterwaveService {
     bank_code: string;
     narration: string;
   }) {
-    const { transactionId, amount, currency, bank_account, bank_code, narration } = params;
+    const {
+      transactionId,
+      amount,
+      currency,
+      bank_account,
+      bank_code,
+      narration,
+    } = params;
 
     try {
       const apiKey = this.getApiKey();
@@ -247,15 +267,16 @@ export class FlutterwaveService {
         callback_url: appUrl ? `${appUrl}/offramp/webhook` : undefined,
       };
 
-      const response = await this.axiosInstance.post<FlutterwaveTransferResponse>(
-        '/transfers',
-        transferPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
+      const response =
+        await this.axiosInstance.post<FlutterwaveTransferResponse>(
+          '/transfers',
+          transferPayload,
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
           },
-        },
-      );
+        );
 
       if (response.data.status !== 'success') {
         throw new Error(response.data.message || 'Transfer initiation failed');
@@ -268,14 +289,26 @@ export class FlutterwaveService {
 
       this.logger.log(`Flutterwave transfer initiated: ${reference}`);
       return response.data.data;
-    } catch (error) {
-      this.logger.error('Flutterwave transfer failed', error.response?.data || error.message);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Flutterwave transfer failed',
+        (error as { response?: { data?: unknown }; message?: string }).response
+          ?.data || (error as { message?: string }).message,
+      );
 
       await this.prisma.transaction.update({
         where: { id: transactionId },
         data: {
           status: 'failed',
-          error: error.response?.data?.message || error.message || 'Transfer initiation failed',
+          error:
+            (
+              error as {
+                response?: { data?: { message?: string } };
+                message?: string;
+              }
+            ).response?.data?.message ||
+            (error as { message?: string }).message ||
+            'Transfer initiation failed',
         },
       });
 
@@ -284,7 +317,11 @@ export class FlutterwaveService {
   }
 
   /** Get exchange rate from Flutterwave */
-  async getExchangeRate(from: string, to: string, amount: number = 1): Promise<number> {
+  async getExchangeRate(
+    from: string,
+    to: string,
+    amount: number = 1,
+  ): Promise<number> {
     try {
       const apiKey = this.getApiKey();
 
@@ -303,14 +340,20 @@ export class FlutterwaveService {
       );
 
       if (response.data.status !== 'success') {
-        throw new Error(response.data.message || 'Failed to fetch exchange rate');
+        throw new Error(
+          response.data.message || 'Failed to fetch exchange rate',
+        );
       }
 
       const rate = response.data.data.rate;
       this.logger.log(`Flutterwave rate: 1 ${from} = ${rate} ${to}`);
       return rate;
-    } catch (error) {
-      this.logger.error('Failed to fetch Flutterwave exchange rate', error.response?.data || error.message);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Failed to fetch Flutterwave exchange rate',
+        (error as { response?: { data?: unknown }; message?: string }).response
+          ?.data || (error as { message?: string }).message,
+      );
       throw new Error('Failed to fetch exchange rate from Flutterwave');
     }
   }
@@ -320,23 +363,30 @@ export class FlutterwaveService {
     try {
       const apiKey = this.getApiKey();
 
-      const response = await this.axiosInstance.get<FlutterwaveBankListResponse>(
-        '/banks/' + country,
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
+      const response =
+        await this.axiosInstance.get<FlutterwaveBankListResponse>(
+          '/banks/' + country,
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
           },
-        },
-      );
+        );
 
       if (response.data.status !== 'success') {
         throw new Error(response.data.message || 'Failed to fetch banks');
       }
 
-      this.logger.log(`Fetched ${response.data.data.length} banks for ${country}`);
+      this.logger.log(
+        `Fetched ${response.data.data.length} banks for ${country}`,
+      );
       return response.data.data;
-    } catch (error) {
-      this.logger.error('Failed to fetch banks', error.response?.data || error.message);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Failed to fetch banks',
+        (error as { response?: { data?: unknown }; message?: string }).response
+          ?.data || (error as { message?: string }).message,
+      );
       throw new Error('Failed to fetch banks from Flutterwave');
     }
   }
@@ -346,18 +396,19 @@ export class FlutterwaveService {
     try {
       const apiKey = this.getApiKey();
 
-      const response = await this.axiosInstance.post<FlutterwaveAccountVerificationResponse>(
-        '/accounts/resolve',
-        {
-          account_number: accountNumber,
-          account_bank: bankCode,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
+      const response =
+        await this.axiosInstance.post<FlutterwaveAccountVerificationResponse>(
+          '/accounts/resolve',
+          {
+            account_number: accountNumber,
+            account_bank: bankCode,
           },
-        },
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
+          },
+        );
 
       if (response.data.status !== 'success') {
         throw new Error(response.data.message || 'Account verification failed');
@@ -368,9 +419,16 @@ export class FlutterwaveService {
         account_number: response.data.data.account_number,
         account_name: response.data.data.account_name,
       };
-    } catch (error) {
-      this.logger.error('Account verification failed', error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || 'Failed to verify account');
+    } catch (error: unknown) {
+      this.logger.error(
+        'Account verification failed',
+        (error as { response?: { data?: unknown }; message?: string }).response
+          ?.data || (error as { message?: string }).message,
+      );
+      throw new Error(
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || 'Failed to verify account',
+      );
     }
   }
 }

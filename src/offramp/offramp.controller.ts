@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { FlutterwaveService } from './flutterwave.service';
 
@@ -18,26 +26,29 @@ export class OfframpController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Flutterwave payment webhook (internal)' })
   handleWebhook(
-    @Body() payload: any,
+    @Body() payload: { event: string; data: Record<string, unknown> },
     @Headers('verif-hash') signature: string,
   ) {
     return this.flutterwaveService.handleWebhook(payload, signature);
   }
 
-
   @Get('banks/:country')
   @ApiOperation({ summary: 'Get list of banks for a country' })
-  @ApiParam({ name: 'country', description: 'Country code (e.g., NG, US)', example: 'NG' })
+  @ApiParam({
+    name: 'country',
+    description: 'Country code (e.g., NG, US)',
+    example: 'NG',
+  })
   getBanks(@Param('country') country: string) {
     return this.flutterwaveService.getBanks(country);
   }
 
   @Post('verify-account')
   @ApiOperation({ summary: 'Verify bank account and get account name' })
-  verifyAccount(
-    @Body() body: { account_number: string; bank_code: string },
-  ) {
-    return this.flutterwaveService.verifyAccount(body.account_number, body.bank_code);
+  verifyAccount(@Body() body: { account_number: string; bank_code: string }) {
+    return this.flutterwaveService.verifyAccount(
+      body.account_number,
+      body.bank_code,
+    );
   }
-
 }
