@@ -1,12 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  Account,
-  Contract,
-  RpcProvider,
-  uint256,
-  constants,
-} from 'starknet';
+import { Account, Contract, RpcProvider, uint256, constants } from 'starknet';
 
 @Injectable()
 export class StarknetService {
@@ -20,7 +14,10 @@ export class StarknetService {
     this.provider = new RpcProvider({
       nodeUrl: this.config.get<string>('STARKNET_RPC_URL')!,
       // Use proper StarknetChainId constant
-      chainId: chainIdConfig === 'SN_SEPOLIA' ? constants.StarknetChainId.SN_SEPOLIA : undefined,
+      chainId:
+        chainIdConfig === 'SN_SEPOLIA'
+          ? constants.StarknetChainId.SN_SEPOLIA
+          : undefined,
     });
 
     const deployerAddress = this.config.get<string>('DEPLOYER_ADDRESS');
@@ -40,7 +37,9 @@ export class StarknetService {
       });
     } else {
       this.account = null;
-      this.logger.warn('Starknet credentials not configured. Some operations will be unavailable.');
+      this.logger.warn(
+        'Starknet credentials not configured. Some operations will be unavailable.',
+      );
     }
   }
 
@@ -50,7 +49,9 @@ export class StarknetService {
 
   get deployerAccount() {
     if (!this.account) {
-      throw new Error('Starknet account not configured. Set DEPLOYER_ADDRESS and DEPLOYER_PRIVATE_KEY in .env');
+      throw new Error(
+        'Starknet account not configured. Set DEPLOYER_ADDRESS and DEPLOYER_PRIVATE_KEY in .env',
+      );
     }
     return this.account;
   }
@@ -58,14 +59,24 @@ export class StarknetService {
   /** Load a contract ABI by address */
   async getContract(address: string): Promise<Contract> {
     const { abi } = await this.provider.getClassAt(address);
-    return new Contract({ abi, address, providerOrAccount: this.deployerAccount });
+    return new Contract({
+      abi,
+      address,
+      providerOrAccount: this.deployerAccount,
+    });
   }
 
   /**
    * Submit a transaction and return the tx hash.
    * Used by the queue processors.
    */
-  async execute(calls: any[]): Promise<string> {
+  async execute(
+    calls: Array<{
+      contractAddress: string;
+      entrypoint: string;
+      calldata: string[];
+    }>,
+  ): Promise<string> {
     try {
       // Execute transaction with proper v9.2.1 signature
       const { transaction_hash } = await this.deployerAccount.execute(calls, {
@@ -92,40 +103,73 @@ export class StarknetService {
   }
 
   /** Check RPC connection health */
-  async checkHealth(): Promise<{ healthy: boolean; blockNumber?: number; error?: string }> {
+  async checkHealth(): Promise<{
+    healthy: boolean;
+    blockNumber?: number;
+    error?: string;
+  }> {
     try {
       const block = await this.provider.getBlock('latest');
       return {
         healthy: true,
         blockNumber: Number(block.block_number),
       };
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('RPC health check failed', error);
       return {
         healthy: false,
-        error: error.message,
+        error: (error as { message?: string }).message,
       };
     }
   }
 
   /** Get account balance */
-  async getBalance(tokenAddress: string, accountAddress: string): Promise<bigint> {
+  async getBalance(
+    tokenAddress: string,
+    accountAddress: string,
+  ): Promise<bigint> {
     try {
       // Use provider for read-only operations
       const { abi } = await this.provider.getClassAt(tokenAddress);
-      const contract = new Contract({ abi, address: tokenAddress, providerOrAccount: this.provider });
-      const result = await contract.balanceOf(accountAddress);
-      
+      const contract = new Contract({
+        abi,
+        address: tokenAddress,
+        providerOrAccount: this.provider,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      const result = (await contract.balanceOf(accountAddress)) as
+        | bigint
+        | { balance?: { low: bigint; high: bigint } | [bigint, bigint] }
+        | { low: bigint; high: bigint }
+        | [bigint, bigint];
+
       // If result is already a BigInt, return it directly
       if (typeof result === 'bigint') {
         return result;
       }
-      
+
       // Handle u256 struct response
-      const balance = result.balance || result;
-      const low = BigInt(balance.low || balance[0] || 0);
-      const high = BigInt(balance.high || balance[1] || 0);
-      
+      const balance =
+        'balance' in result && result.balance ? result.balance : result;
+
+      let lowValue: bigint;
+      let highValue: bigint;
+
+      if (Array.isArray(balance)) {
+        lowValue = balance[0];
+        highValue = balance[1];
+      } else if ('low' in balance && 'high' in balance) {
+        lowValue = balance.low;
+        highValue = balance.high;
+      } else {
+        // Fallback to 0 if structure is unexpected
+        lowValue = 0n;
+        highValue = 0n;
+      }
+
+      const low = BigInt(lowValue || 0);
+      const high = BigInt(highValue || 0);
+
       return low + (high << 128n);
     } catch (error) {
       this.logger.error(`Failed to get balance for ${accountAddress}`, error);

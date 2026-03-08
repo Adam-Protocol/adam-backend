@@ -21,9 +21,14 @@ export class EventListenerService implements OnModuleInit {
       // Get the latest block on startup
       const block = await this.starknet.rpcProvider.getBlockNumber();
       this.lastProcessedBlock = block - 100; // Start from 100 blocks ago
-      this.logger.log(`Event listener initialized at block ${this.lastProcessedBlock}`);
+      this.logger.log(
+        `Event listener initialized at block ${this.lastProcessedBlock}`,
+      );
     } catch (err) {
-      this.logger.warn('Event listener initialization failed (RPC may be unavailable)', err);
+      this.logger.warn(
+        'Event listener initialization failed (RPC may be unavailable)',
+        err,
+      );
       this.lastProcessedBlock = 0;
     }
   }
@@ -35,7 +40,7 @@ export class EventListenerService implements OnModuleInit {
   async pollEvents() {
     try {
       const currentBlock = await this.starknet.rpcProvider.getBlockNumber();
-      
+
       if (currentBlock <= this.lastProcessedBlock) {
         return; // No new blocks
       }
@@ -89,7 +94,7 @@ export class EventListenerService implements OnModuleInit {
       });
 
       for (const event of events.events) {
-        await this.handlePoolEvent(event);
+        this.handlePoolEvent(event);
       }
     } catch (err) {
       this.logger.error('Failed to process pool events', err);
@@ -99,7 +104,11 @@ export class EventListenerService implements OnModuleInit {
   /**
    * Handle individual swap events
    */
-  private async handleSwapEvent(event: any) {
+  private async handleSwapEvent(event: {
+    keys: string[];
+    data: string[];
+    transaction_hash: string;
+  }) {
     const eventName = this.getEventName(event.keys[0]);
 
     switch (eventName) {
@@ -113,7 +122,7 @@ export class EventListenerService implements OnModuleInit {
         await this.handleSwapExecuted(event);
         break;
       case 'RateUpdated':
-        this.logger.log(`Rate updated on-chain: ${event.data}`);
+        this.logger.log(`Rate updated on-chain: ${JSON.stringify(event.data)}`);
         break;
     }
   }
@@ -121,15 +130,19 @@ export class EventListenerService implements OnModuleInit {
   /**
    * Handle individual pool events
    */
-  private async handlePoolEvent(event: any) {
+  private handlePoolEvent(event: {
+    keys: string[];
+    data: string[];
+    transaction_hash: string;
+  }) {
     const eventName = this.getEventName(event.keys[0]);
 
     switch (eventName) {
       case 'CommitmentRegistered':
-        await this.handleCommitmentRegistered(event);
+        this.handleCommitmentRegistered(event);
         break;
       case 'NullifierSpent':
-        await this.handleNullifierSpent(event);
+        this.handleNullifierSpent(event);
         break;
     }
   }
@@ -138,7 +151,10 @@ export class EventListenerService implements OnModuleInit {
    * BuyExecuted event handler
    * Event data: { commitment: felt252, token_out: ContractAddress, timestamp: u64 }
    */
-  private async handleBuyExecuted(event: any) {
+  private async handleBuyExecuted(event: {
+    data: string[];
+    transaction_hash: string;
+  }) {
     const commitment = event.data[0];
     const txHash = event.transaction_hash;
 
@@ -159,7 +175,10 @@ export class EventListenerService implements OnModuleInit {
    * SellExecuted event handler
    * Event data: { nullifier: felt252, token_in: ContractAddress, timestamp: u64 }
    */
-  private async handleSellExecuted(event: any) {
+  private async handleSellExecuted(event: {
+    data: string[];
+    transaction_hash: string;
+  }) {
     const nullifier = event.data[0];
     const txHash = event.transaction_hash;
 
@@ -180,7 +199,10 @@ export class EventListenerService implements OnModuleInit {
    * SwapExecuted event handler
    * Event data: { commitment: felt252, token_in: ContractAddress, token_out: ContractAddress, timestamp: u64 }
    */
-  private async handleSwapExecuted(event: any) {
+  private async handleSwapExecuted(event: {
+    data: string[];
+    transaction_hash: string;
+  }) {
     const commitment = event.data[0];
     const txHash = event.transaction_hash;
 
@@ -200,7 +222,7 @@ export class EventListenerService implements OnModuleInit {
   /**
    * CommitmentRegistered event handler
    */
-  private async handleCommitmentRegistered(event: any) {
+  private handleCommitmentRegistered(event: { data: string[] }) {
     const commitment = event.data[0];
     this.logger.debug(`Commitment registered on-chain: ${commitment}`);
   }
@@ -208,7 +230,7 @@ export class EventListenerService implements OnModuleInit {
   /**
    * NullifierSpent event handler
    */
-  private async handleNullifierSpent(event: any) {
+  private handleNullifierSpent(event: { data: string[] }) {
     const nullifier = event.data[0];
     this.logger.debug(`Nullifier spent on-chain: ${nullifier}`);
   }
@@ -222,7 +244,8 @@ export class EventListenerService implements OnModuleInit {
       [hash.getSelectorFromName('SellExecuted')]: 'SellExecuted',
       [hash.getSelectorFromName('SwapExecuted')]: 'SwapExecuted',
       [hash.getSelectorFromName('RateUpdated')]: 'RateUpdated',
-      [hash.getSelectorFromName('CommitmentRegistered')]: 'CommitmentRegistered',
+      [hash.getSelectorFromName('CommitmentRegistered')]:
+        'CommitmentRegistered',
       [hash.getSelectorFromName('NullifierSpent')]: 'NullifierSpent',
     };
     return eventMap[key] || 'Unknown';
