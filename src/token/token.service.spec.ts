@@ -48,9 +48,11 @@ describe('TokenService', () => {
 
     it('should create a pending transaction and enqueue buy job', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(null);
-      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-1' });
 
-      const result = await service.buy(buyDto);
+      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-1' } as any);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const result = await service.buy(buyDto as any);
 
       expect(mockPrisma.transaction.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -61,12 +63,20 @@ describe('TokenService', () => {
           }),
         }),
       );
-      expect(mockQueue.add).toHaveBeenCalledWith('submit-buy', expect.any(Object), expect.any(Object));
-      expect(result.status).toBe('pending');
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'submit-buy',
+        expect.any(Object),
+        expect.any(Object),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect((result as any).status).toBe('pending');
     });
 
     it('should throw BadRequestException if commitment already exists', async () => {
-      mockPrisma.transaction.findUnique.mockResolvedValue({ id: 'existing-tx' });
+      mockPrisma.transaction.findUnique.mockResolvedValue({
+        id: 'existing-tx',
+      });
 
       await expect(service.buy(buyDto)).rejects.toThrow(BadRequestException);
       expect(mockQueue.add).not.toHaveBeenCalled();
@@ -87,9 +97,11 @@ describe('TokenService', () => {
 
     it('should create a pending sell transaction and enqueue job', async () => {
       mockPrisma.transaction.findFirst.mockResolvedValue(null);
-      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-2' });
 
-      const result = await service.sell(sellDto);
+      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-2' } as any);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const result = await service.sell(sellDto as any);
 
       expect(mockPrisma.transaction.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -100,8 +112,14 @@ describe('TokenService', () => {
           }),
         }),
       );
-      expect(mockQueue.add).toHaveBeenCalledWith('submit-sell', expect.any(Object), expect.any(Object));
-      expect(result.status).toBe('pending');
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'submit-sell',
+        expect.any(Object),
+        expect.any(Object),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect((result as any).status).toBe('pending');
     });
 
     it('should throw BadRequestException if nullifier already spent', async () => {

@@ -22,17 +22,28 @@ export class TokenService {
     // Check if this exact commitment already exists for a buy transaction
     // (same commitment can be used for sell, but not for multiple buys)
     const existing = await this.prisma.transaction.findFirst({
-      where: { 
+      where: {
         commitment: dto.commitment,
-        type: 'buy'
+        type: 'buy',
       },
     });
     if (existing) {
-      throw new BadRequestException('Commitment already used for a buy transaction');
+      throw new BadRequestException(
+        'Commitment already used for a buy transaction',
+      );
     }
 
     // Use custom transactionId if provided, otherwise let Prisma generate one
-    const txData: any = {
+    const txData: {
+      wallet: string;
+      type: string;
+      commitment: string;
+      token_in: string;
+      token_out: string;
+      status: string;
+      tx_hash: string | null;
+      id?: string;
+    } = {
       wallet: dto.wallet,
       type: 'buy',
       commitment: dto.commitment,
@@ -50,7 +61,9 @@ export class TokenService {
       data: txData,
     });
 
-    this.logger.log(`Buy transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`);
+    this.logger.log(
+      `Buy transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`,
+    );
     return { transaction_id: tx.id, status: tx.status, tx_hash: tx.tx_hash };
   }
 
@@ -64,7 +77,20 @@ export class TokenService {
     }
 
     // Use custom transactionId if provided, otherwise let Prisma generate one
-    const txData: any = {
+    const txData: {
+      wallet: string;
+      type: string;
+      commitment: string;
+      nullifier: string;
+      token_in: string;
+      token_out: string;
+      status: string;
+      tx_hash: string | null;
+      currency: string;
+      bank_account: string;
+      bank_code: string;
+      id?: string;
+    } = {
       wallet: dto.wallet,
       type: 'sell',
       commitment: dto.commitment,
@@ -104,10 +130,14 @@ export class TokenService {
           removeOnComplete: true,
         },
       );
-      this.logger.log(`Bank transfer job ${job.id} enqueued for transaction ${tx.id}`);
+      this.logger.log(
+        `Bank transfer job ${job.id} enqueued for transaction ${tx.id}`,
+      );
     }
 
-    this.logger.log(`Sell transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`);
+    this.logger.log(
+      `Sell transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`,
+    );
     return { transaction_id: tx.id, status: tx.status, tx_hash: tx.tx_hash };
   }
 
@@ -125,7 +155,9 @@ export class TokenService {
       const [adusdBalance, adngnBalance, usdcBalance] = await Promise.all([
         this.starknet.getBalance(adusdAddress, wallet),
         this.starknet.getBalance(adngnAddress, wallet),
-        usdcAddress ? this.starknet.getBalance(usdcAddress, wallet) : Promise.resolve(0n),
+        usdcAddress
+          ? this.starknet.getBalance(usdcAddress, wallet)
+          : Promise.resolve(0n),
       ]);
 
       // ADUSD and ADNGN have 18 decimals, USDC has 6 decimals
@@ -159,28 +191,26 @@ export class TokenService {
     }
   }
 
+  /** Get all buy commitments for a wallet that can be used for selling */
+  async getCommitments(wallet: string) {
+    const commitments = await this.prisma.transaction.findMany({
+      where: {
+        wallet,
+        type: 'buy',
+        status: 'completed',
+      },
+      select: {
+        id: true,
+        commitment: true,
+        token_out: true,
+        created_at: true,
+        status: true,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
 
-    /** Get all buy commitments for a wallet that can be used for selling */
-    async getCommitments(wallet: string) {
-      const commitments = await this.prisma.transaction.findMany({
-        where: {
-          wallet,
-          type: 'buy',
-          status: 'completed',
-        },
-        select: {
-          id: true,
-          commitment: true,
-          token_out: true,
-          created_at: true,
-          status: true,
-        },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
-
-      return commitments;
-    }
-
+    return commitments;
+  }
 }

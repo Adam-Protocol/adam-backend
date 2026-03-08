@@ -31,12 +31,13 @@ export class TokenController {
     return this.tokenService.getBalances(wallet);
   }
 
-
   @Get('commitments/:wallet')
   @ApiOperation({ summary: 'Get all buy commitments for a wallet' })
-  @ApiResponse({ status: 200, description: 'Returns list of commitments from completed buy transactions' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns list of commitments from completed buy transactions',
+  })
   getCommitments(@Param('wallet') wallet: string) {
     return this.tokenService.getCommitments(wallet);
   }
-
 }
