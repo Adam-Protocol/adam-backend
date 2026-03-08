@@ -12,7 +12,7 @@ export class ActivityService {
     const { page, limit, type } = opts;
     const skip = (page - 1) * limit;
 
-    const where: any = { wallet };
+    const where: { wallet: string; type?: string } = { wallet };
     if (type !== 'all') where.type = type;
 
     const [data, total] = await this.prisma.$transaction([

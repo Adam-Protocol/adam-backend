@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ActivityService } from './activity.service';
 
@@ -12,7 +12,11 @@ export class ActivityController {
   @ApiParam({ name: 'wallet', description: 'Starknet wallet address' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
-  @ApiQuery({ name: 'type', required: false, enum: ['buy', 'sell', 'swap', 'all'] })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['buy', 'sell', 'swap', 'all'],
+  })
   getActivity(
     @Param('wallet') wallet: string,
     @Query('page') page = '1',
