@@ -5,10 +5,7 @@ import { SwapService } from './swap.service';
 import { OfframpModule } from '../offramp/offramp.module';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: 'chain-tx' }),
-    OfframpModule,
-  ],
+  imports: [BullModule.registerQueue({ name: 'chain-tx' }), OfframpModule],
   controllers: [SwapController],
   providers: [SwapService],
   exports: [SwapService],

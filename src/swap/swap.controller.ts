@@ -11,14 +11,19 @@ export class SwapController {
 
   @Post()
   @HttpCode(202)
-  @ApiOperation({ summary: 'Record swap transaction (execution happens on frontend)' })
+  @ApiOperation({
+    summary: 'Record swap transaction (execution happens on frontend)',
+  })
   swap(@Body() dto: SwapDto) {
     return this.swapService.swap(dto);
   }
 
   @Get('rate')
   @ApiOperation({ summary: 'Get live USD/NGN rate' })
-  @ApiResponse({ status: 200, description: 'Returns { usd_ngn, updated_at, source }' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns { usd_ngn, updated_at, source }',
+  })
   getRate() {
     return this.swapService.getLiveRate();
   }

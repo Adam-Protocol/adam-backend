@@ -12,7 +12,11 @@ import { RateSource } from './rate-source.enum';
 @Injectable()
 export class SwapService {
   private readonly logger = new Logger(SwapService.name);
-  private cachedRate: { usd_ngn: number; updated_at: Date; source: RateSource } | null = null;
+  private cachedRate: {
+    usd_ngn: number;
+    updated_at: Date;
+    source: RateSource;
+  } | null = null;
   private defaultRateSource: RateSource = RateSource.EXCHANGE_RATE_API;
 
   constructor(
@@ -28,9 +32,14 @@ export class SwapService {
   }
 
   /** Set default rate source */
-  setDefaultRateSource(source: RateSource): { source: RateSource; message: string } {
+  setDefaultRateSource(source: RateSource): {
+    source: RateSource;
+    message: string;
+  } {
     if (!Object.values(RateSource).includes(source)) {
-      throw new Error(`Invalid rate source. Must be one of: ${Object.values(RateSource).join(', ')}`);
+      throw new Error(
+        `Invalid rate source. Must be one of: ${Object.values(RateSource).join(', ')}`,
+      );
     }
     this.defaultRateSource = source;
     this.logger.log(`Default rate source changed to: ${source}`);
@@ -41,7 +50,11 @@ export class SwapService {
   }
 
   /** Get live USD/NGN rate from cache or fetch from source */
-  async getLiveRate(): Promise<{ usd_ngn: number; updated_at: Date | null; source: RateSource }> {
+  async getLiveRate(): Promise<{
+    usd_ngn: number;
+    updated_at: Date | null;
+    source: RateSource;
+  }> {
     if (this.cachedRate) {
       return {
         usd_ngn: this.cachedRate.usd_ngn,
@@ -56,7 +69,9 @@ export class SwapService {
   private async fetchFromExchangeRateApi(): Promise<number> {
     const key = this.config.get<string>('EXCHANGE_RATE_API_KEY');
     const url = `${this.config.get('EXCHANGE_RATE_API_URL')}/${key}/latest/USD`;
-    const { data } = await axios.get(url);
+    const { data } = await axios.get<{
+      conversion_rates: { NGN: number };
+    }>(url);
     return data.conversion_rates.NGN;
   }
 
@@ -77,8 +92,10 @@ export class SwapService {
         try {
           usd_ngn = await this.fetchFromFlutterwave();
           source = RateSource.FLUTTERWAVE;
-        } catch (err) {
-          this.logger.warn('Flutterwave rate fetch failed, falling back to ExchangeRate-API');
+        } catch {
+          this.logger.warn(
+            'Flutterwave rate fetch failed, falling back to ExchangeRate-API',
+          );
           usd_ngn = await this.fetchFromExchangeRateApi();
           source = RateSource.EXCHANGE_RATE_API;
         }
@@ -86,8 +103,10 @@ export class SwapService {
         try {
           usd_ngn = await this.fetchFromExchangeRateApi();
           source = RateSource.EXCHANGE_RATE_API;
-        } catch (err) {
-          this.logger.warn('ExchangeRate-API fetch failed, falling back to Flutterwave');
+        } catch {
+          this.logger.warn(
+            'ExchangeRate-API fetch failed, falling back to Flutterwave',
+          );
           usd_ngn = await this.fetchFromFlutterwave();
           source = RateSource.FLUTTERWAVE;
         }
@@ -117,7 +136,16 @@ export class SwapService {
   /** Record a swap transaction (execution happens on frontend) */
   async swap(dto: SwapDto) {
     // Use custom transactionId if provided, otherwise let Prisma generate one
-    const txData: any = {
+    const txData: {
+      wallet: string;
+      type: string;
+      commitment: string;
+      token_in: string;
+      token_out: string;
+      status: string;
+      tx_hash: string | null;
+      id?: string;
+    } = {
       wallet: dto.wallet,
       type: 'swap',
       commitment: dto.commitment,
@@ -135,7 +163,9 @@ export class SwapService {
       data: txData,
     });
 
-    this.logger.log(`Swap transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`);
+    this.logger.log(
+      `Swap transaction recorded for wallet ${dto.wallet}, tx_hash: ${dto.tx_hash || 'pending'}`,
+    );
     return { transaction_id: tx.id, status: tx.status, tx_hash: tx.tx_hash };
   }
 }
