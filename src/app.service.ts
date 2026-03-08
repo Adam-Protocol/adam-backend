@@ -36,20 +36,20 @@ export class AppService {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       checks.database = 'connected';
-    } catch (err) {
+    } catch {
       checks.database = 'disconnected';
       checks.status = 'degraded';
-      this.logger.error('Database health check failed', err);
+      this.logger.error('Database health check failed');
     }
 
     // Check Starknet RPC
     try {
       await this.starknet.rpcProvider.getBlockNumber();
       checks.starknet = 'connected';
-    } catch (err) {
+    } catch {
       checks.starknet = 'disconnected';
       checks.status = 'degraded';
-      this.logger.error('Starknet RPC health check failed', err);
+      this.logger.error('Starknet RPC health check failed');
     }
 
     // Check contract addresses are configured
@@ -72,7 +72,7 @@ export class AppService {
       try {
         await this.starknet.rpcProvider.getClassAt(swapAddress);
         checks.contracts.swap = 'deployed';
-      } catch (err) {
+      } catch {
         checks.contracts.swap = 'not_deployed';
         checks.status = 'degraded';
       }

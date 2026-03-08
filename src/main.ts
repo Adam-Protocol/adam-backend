@@ -36,4 +36,4 @@ async function bootstrap() {
   console.log(`Adam Protocol API running on http://localhost:${port}/api`);
 }
 
-bootstrap();
+void bootstrap();

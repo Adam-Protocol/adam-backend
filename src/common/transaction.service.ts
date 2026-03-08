@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { Transaction } from '@prisma/client';
 
-export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TransactionStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed';
 
 @Injectable()
 export class TransactionService {
@@ -23,7 +27,9 @@ export class TransactionService {
       where: { id },
       data: { status, ...extra },
     });
-    this.logger.log(`Transaction ${id} → ${status}${extra?.tx_hash ? ` (tx: ${extra.tx_hash})` : ''}`);
+    this.logger.log(
+      `Transaction ${id} → ${status}${extra?.tx_hash ? ` (tx: ${extra.tx_hash})` : ''}`,
+    );
     return tx;
   }
 
