@@ -50,6 +50,9 @@ importers:
       ioredis:
         specifier: ^5.0.0
         version: 5.9.3
+      prisma:
+        specifier: ^6.0.0
+        version: 6.19.2(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -105,9 +108,6 @@ importers:
       prettier:
         specifier: ^3.4.2
         version: 3.8.1
-      prisma:
-        specifier: ^6.0.0
-        version: 6.19.2(typescript@5.9.3)
       source-map-support:
         specifier: ^0.5.21
         version: 0.5.21
