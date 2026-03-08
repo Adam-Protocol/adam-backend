@@ -20,26 +20,65 @@ export class ChainTxProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job) {
+  async process(job: Job<Record<string, unknown>>) {
     this.logger.log(`Processing chain-tx job: ${job.name} (id: ${job.id})`);
 
     switch (job.name) {
       case 'submit-buy':
-        return this.processBuy(job.data);
+        return this.processBuy(
+          job.data as {
+            transactionId: string;
+            amount_in: string;
+            token_out: string;
+            commitment: string;
+          },
+        );
       case 'process-bank-transfer':
-        return this.processBankTransfer(job.data);
+        return this.processBankTransfer(
+          job.data as {
+            transactionId: string;
+            amount: string;
+            currency: string;
+            bank_account: string;
+            bank_code: string;
+            token_in: string;
+          },
+        );
       case 'submit-swap':
-        return this.processSwap(job.data);
+        return this.processSwap(
+          job.data as {
+            transactionId: string;
+            token_in: string;
+            amount_in: string;
+            token_out: string;
+            min_amount_out: string;
+            commitment: string;
+          },
+        );
       case 'push-rate':
-        return this.processRateUpdate(job.data);
+        return this.processRateUpdate(job.data as { usd_ngn: number });
       default:
         this.logger.warn(`Unknown job: ${job.name}`);
     }
   }
 
-  private async processBankTransfer(data: any) {
-    console.log("Bank transfer data", data);
-    const { transactionId, amount, currency, bank_account, bank_code, token_in } = data;
+  private async processBankTransfer(data: {
+    transactionId: string;
+    amount: string;
+    currency: string;
+    bank_account: string;
+    bank_code: string;
+    token_in: string;
+  }) {
+    console.log('Bank transfer data', data);
+    const {
+      transactionId,
+      amount,
+      currency,
+      bank_account,
+      bank_code,
+      token_in,
+    } = data;
 
     try {
       await this.prisma.transaction.update({
@@ -63,39 +102,64 @@ export class ChainTxProcessor extends WorkerHost {
           data: { status: 'completed' },
         });
 
-        this.logger.log(`Bank transfer completed for transaction: ${transactionId}`);
-      } catch (flutterwaveError: any) {
+        this.logger.log(
+          `Bank transfer completed for transaction: ${transactionId}`,
+        );
+      } catch (flutterwaveError: unknown) {
         // Check if it's a merchant not enabled error (common in test/sandbox mode)
-        const errorMessage = flutterwaveError?.response?.data?.message || flutterwaveError?.message || '';
-        const isMerchantNotEnabled = errorMessage.includes('merchant is not enabled');
+        const errorMessage =
+          (
+            flutterwaveError as {
+              response?: { data?: { message?: string } };
+              message?: string;
+            }
+          )?.response?.data?.message ||
+          (flutterwaveError as { message?: string })?.message ||
+          '';
+        const isMerchantNotEnabled = String(errorMessage).includes(
+          'merchant is not enabled',
+        );
 
         if (isMerchantNotEnabled) {
           // In development/test mode, mark as completed with a note
-          this.logger.warn(`Flutterwave not enabled for transfers. Marking transaction as completed (dev mode).`);
+          this.logger.warn(
+            `Flutterwave not enabled for transfers. Marking transaction as completed (dev mode).`,
+          );
           await this.prisma.transaction.update({
             where: { id: transactionId },
-            data: { 
+            data: {
               status: 'completed',
-              error: 'Bank transfer skipped: Flutterwave merchant not enabled (test mode)'
+              error:
+                'Bank transfer skipped: Flutterwave merchant not enabled (test mode)',
             },
           });
-          this.logger.log(`Transaction ${transactionId} marked as completed (Flutterwave disabled)`);
+          this.logger.log(
+            `Transaction ${transactionId} marked as completed (Flutterwave disabled)`,
+          );
         } else {
           // For other errors, mark as failed and rethrow
           throw flutterwaveError;
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       await this.prisma.transaction.update({
         where: { id: transactionId },
-        data: { status: 'failed', error: err.message },
+        data: {
+          status: 'failed',
+          error: (err as { message?: string }).message,
+        },
       });
       throw err;
     }
   }
 
-  private async processBuy(data: any) {
-    console.log("data", data);
+  private async processBuy(data: {
+    transactionId: string;
+    amount_in: string;
+    token_out: string;
+    commitment: string;
+  }) {
+    console.log('data', data);
     const { transactionId, amount_in, token_out, commitment } = data;
 
     try {
@@ -108,16 +172,23 @@ export class ChainTxProcessor extends WorkerHost {
       const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
       const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
       const usdcAddress = this.config.get<string>('USDC_ADDRESS');
-      const tokenOutAddress = token_out === 'adusd' ? adusdAddress : adngnAddress;
+      const tokenOutAddress =
+        token_out === 'adusd' ? adusdAddress : adngnAddress;
 
-      const amountU256 = uint256.bnToUint256(amount_in);
+      const amountU256 = uint256.bnToUint256(BigInt(amount_in));
 
       // Approval is now done in the frontend, so we only execute the buy
       const txHash = await this.starknet.execute([
         {
-          contractAddress: swapAddress,
+          contractAddress: swapAddress!,
           entrypoint: 'buy',
-          calldata: [usdcAddress, amountU256, tokenOutAddress, commitment],
+          calldata: [
+            usdcAddress!,
+            amountU256.low.toString(),
+            amountU256.high.toString(),
+            tokenOutAddress!,
+            commitment,
+          ],
         },
       ]);
 
@@ -127,20 +198,35 @@ export class ChainTxProcessor extends WorkerHost {
       });
 
       this.logger.log(`Buy completed: ${txHash}`);
-    } catch (err) {
+    } catch (err: unknown) {
       // For errors, mark as failed and allow retry
       await this.prisma.transaction.update({
         where: { id: transactionId },
-        data: { status: 'failed', error: err.message },
+        data: {
+          status: 'failed',
+          error: (err as { message?: string }).message,
+        },
       });
       throw err; // BullMQ will retry
     }
   }
 
-
-
-  private async processSwap(data: any) {
-    const { transactionId, token_in, amount_in, token_out, min_amount_out, commitment } = data;
+  private async processSwap(data: {
+    transactionId: string;
+    token_in: string;
+    amount_in: string;
+    token_out: string;
+    min_amount_out: string;
+    commitment: string;
+  }) {
+    const {
+      transactionId,
+      token_in,
+      amount_in,
+      token_out,
+      min_amount_out,
+      commitment,
+    } = data;
 
     try {
       await this.prisma.transaction.update({
@@ -158,13 +244,15 @@ export class ChainTxProcessor extends WorkerHost {
 
       const txHash = await this.starknet.execute([
         {
-          contractAddress: swapAddress,
+          contractAddress: swapAddress!,
           entrypoint: 'swap',
           calldata: [
-            tokenInAddr,
-            amountInU256.low.toString(), amountInU256.high.toString(),
-            tokenOutAddr,
-            minOutU256.low.toString(), minOutU256.high.toString(),
+            tokenInAddr!,
+            amountInU256.low.toString(),
+            amountInU256.high.toString(),
+            tokenOutAddr!,
+            minOutU256.low.toString(),
+            minOutU256.high.toString(),
             commitment,
           ],
         },
@@ -176,10 +264,13 @@ export class ChainTxProcessor extends WorkerHost {
       });
 
       this.logger.log(`Swap completed: ${txHash}`);
-    } catch (err) {
+    } catch (err: unknown) {
       await this.prisma.transaction.update({
         where: { id: transactionId },
-        data: { status: 'failed', error: err.message },
+        data: {
+          status: 'failed',
+          error: (err as { message?: string }).message,
+        },
       });
       throw err;
     }
@@ -201,20 +292,30 @@ export class ChainTxProcessor extends WorkerHost {
       await this.starknet.execute([
         // ADUSD -> ADNGN
         {
-          contractAddress: swapAddress,
+          contractAddress: swapAddress!,
           entrypoint: 'set_rate',
-          calldata: [adusdAddress, adngnAddress, rateU256.low.toString(), rateU256.high.toString()],
+          calldata: [
+            adusdAddress!,
+            adngnAddress!,
+            rateU256.low.toString(),
+            rateU256.high.toString(),
+          ],
         },
         // ADNGN -> ADUSD
         {
-          contractAddress: swapAddress,
+          contractAddress: swapAddress!,
           entrypoint: 'set_rate',
-          calldata: [adngnAddress, adusdAddress, inverseU256.low.toString(), inverseU256.high.toString()],
+          calldata: [
+            adngnAddress!,
+            adusdAddress!,
+            inverseU256.low.toString(),
+            inverseU256.high.toString(),
+          ],
         },
       ]);
 
       this.logger.log(`Rate updated on-chain: 1 ADUSD = ${usd_ngn} ADNGN`);
-    } catch (err) {
+    } catch (err: unknown) {
       this.logger.error('Rate update on-chain failed', err);
       throw err;
     }
