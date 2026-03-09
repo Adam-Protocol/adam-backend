@@ -28,11 +28,11 @@ export class BuyTokenDto {
   amount_in: string;
 
   @ApiProperty({
-    description: 'Token to receive: adusd or adngn',
-    enum: ['adusd', 'adngn'],
+    description: 'Token to receive: adusd, adngn, adkes, adghs, or adzar',
+    enum: ['adusd', 'adngn', 'adkes', 'adghs', 'adzar'],
   })
-  @IsIn(['adusd', 'adngn'])
-  token_out: 'adusd' | 'adngn';
+  @IsIn(['adusd', 'adngn', 'adkes', 'adghs', 'adzar'])
+  token_out: 'adusd' | 'adngn' | 'adkes' | 'adghs' | 'adzar';
 
   @ApiProperty({
     description: 'Pedersen commitment hash (computed client-side)',
@@ -64,11 +64,11 @@ export class SellTokenDto {
   wallet: string;
 
   @ApiProperty({
-    description: 'Token to sell: adusd or adngn',
-    enum: ['adusd', 'adngn'],
+    description: 'Token to sell: adusd, adngn, adkes, adghs, or adzar',
+    enum: ['adusd', 'adngn', 'adkes', 'adghs', 'adzar'],
   })
-  @IsIn(['adusd', 'adngn'])
-  token_in: 'adusd' | 'adngn';
+  @IsIn(['adusd', 'adngn', 'adkes', 'adghs', 'adzar'])
+  token_in: 'adusd' | 'adngn' | 'adkes' | 'adghs' | 'adzar';
 
   @ApiProperty({
     description: 'Amount to sell in wei (18 decimals)',
@@ -91,9 +91,9 @@ export class SellTokenDto {
   @IsString()
   commitment: string;
 
-  @ApiProperty({ description: 'Target currency', enum: ['NGN', 'USD'] })
-  @IsIn(['NGN', 'USD'])
-  currency: 'NGN' | 'USD';
+  @ApiProperty({ description: 'Target currency', enum: ['NGN', 'USD', 'KES', 'GHS', 'ZAR'] })
+  @IsIn(['NGN', 'USD', 'KES', 'GHS', 'ZAR'])
+  currency: 'NGN' | 'USD' | 'KES' | 'GHS' | 'ZAR';
 
   @ApiProperty({ description: 'Bank account number', example: '0123456789' })
   @IsString()
