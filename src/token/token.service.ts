@@ -146,23 +146,30 @@ export class TokenService {
     try {
       const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
       const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
+      const adkesAddress = this.config.get<string>('ADKES_ADDRESS');
+      const adghsAddress = this.config.get<string>('ADGHS_ADDRESS');
+      const adzarAddress = this.config.get<string>('ADZAR_ADDRESS');
       const usdcAddress = this.config.get<string>('USDC_ADDRESS');
 
       if (!adusdAddress || !adngnAddress) {
         throw new Error('Token addresses not configured');
       }
 
-      const [adusdBalance, adngnBalance, usdcBalance] = await Promise.all([
+      const [adusdBalance, adngnBalance, adkesBalance, adghsBalance, adzarBalance, usdcBalance] = await Promise.all([
         this.starknet.getBalance(adusdAddress, wallet),
         this.starknet.getBalance(adngnAddress, wallet),
-        usdcAddress
-          ? this.starknet.getBalance(usdcAddress, wallet)
-          : Promise.resolve(0n),
+        adkesAddress ? this.starknet.getBalance(adkesAddress, wallet) : Promise.resolve(0n),
+        adghsAddress ? this.starknet.getBalance(adghsAddress, wallet) : Promise.resolve(0n),
+        adzarAddress ? this.starknet.getBalance(adzarAddress, wallet) : Promise.resolve(0n),
+        usdcAddress ? this.starknet.getBalance(usdcAddress, wallet) : Promise.resolve(0n),
       ]);
 
-      // ADUSD and ADNGN have 18 decimals, USDC has 6 decimals
+      // All Adam tokens have 18 decimals, USDC has 6 decimals
       const adusdFormatted = Number(adusdBalance) / 1e18;
       const adngnFormatted = Number(adngnBalance) / 1e18;
+      const adkesFormatted = Number(adkesBalance) / 1e18;
+      const adghsFormatted = Number(adghsBalance) / 1e18;
+      const adzarFormatted = Number(adzarBalance) / 1e18;
       const usdcFormatted = Number(usdcBalance) / 1e6;
 
       return {
@@ -176,6 +183,21 @@ export class TokenService {
           adngn: {
             raw: adngnBalance.toString(),
             formatted: adngnFormatted.toFixed(2),
+            decimals: 18,
+          },
+          adkes: {
+            raw: adkesBalance.toString(),
+            formatted: adkesFormatted.toFixed(2),
+            decimals: 18,
+          },
+          adghs: {
+            raw: adghsBalance.toString(),
+            formatted: adghsFormatted.toFixed(2),
+            decimals: 18,
+          },
+          adzar: {
+            raw: adzarBalance.toString(),
+            formatted: adzarFormatted.toFixed(2),
             decimals: 18,
           },
           usdc: {

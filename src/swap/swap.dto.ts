@@ -14,9 +14,9 @@ export class SwapDto {
   @IsString()
   wallet: string;
 
-  @ApiProperty({ enum: ['adusd', 'adngn'] })
-  @IsIn(['adusd', 'adngn'])
-  token_in: 'adusd' | 'adngn';
+  @ApiProperty({ enum: ['adusd', 'adngn', 'adkes', 'adghs', 'adzar'] })
+  @IsIn(['adusd', 'adngn', 'adkes', 'adghs', 'adzar'])
+  token_in: 'adusd' | 'adngn' | 'adkes' | 'adghs' | 'adzar';
 
   @ApiProperty({
     description: 'Amount in wei (18 decimals)',
@@ -25,9 +25,9 @@ export class SwapDto {
   @IsNumberString()
   amount_in: string;
 
-  @ApiProperty({ enum: ['adusd', 'adngn'] })
-  @IsIn(['adusd', 'adngn'])
-  token_out: 'adusd' | 'adngn';
+  @ApiProperty({ enum: ['adusd', 'adngn', 'adkes', 'adghs', 'adzar'] })
+  @IsIn(['adusd', 'adngn', 'adkes', 'adghs', 'adzar'])
+  token_out: 'adusd' | 'adngn' | 'adkes' | 'adghs' | 'adzar';
 
   @ApiProperty({
     description: 'Min amount out (slippage protection)',

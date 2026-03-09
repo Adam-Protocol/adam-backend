@@ -17,6 +17,9 @@ async function grantSwapRoles() {
   const swapAddress = process.env.ADAM_SWAP_ADDRESS!;
   const adusdAddress = process.env.ADUSD_ADDRESS!;
   const adngnAddress = process.env.ADNGN_ADDRESS!;
+  const adkesAddress = process.env.ADKES_ADDRESS!;
+  const adghsAddress = process.env.ADGHS_ADDRESS!;
+  const adzarAddress = process.env.ADZAR_ADDRESS!;
 
   const MINTER_ROLE = hash.getSelectorFromName('MINTER_ROLE');
   const BURNER_ROLE = hash.getSelectorFromName('BURNER_ROLE');
@@ -25,6 +28,9 @@ async function grantSwapRoles() {
   console.log('Swap contract:', swapAddress);
   console.log('ADUSD token:', adusdAddress);
   console.log('ADNGN token:', adngnAddress);
+  console.log('ADKES token:', adkesAddress);
+  console.log('ADGHS token:', adghsAddress);
+  console.log('ADZAR token:', adzarAddress);
   console.log('MINTER_ROLE:', MINTER_ROLE);
   console.log('BURNER_ROLE:', BURNER_ROLE);
 
@@ -80,6 +86,84 @@ async function grantSwapRoles() {
     console.log('Transaction hash:', tx4);
     await provider.waitForTransaction(tx4);
     console.log('✅ BURNER_ROLE granted on ADNGN');
+
+    // Grant MINTER_ROLE to swap contract on ADKES
+    console.log('\n5. Granting MINTER_ROLE on ADKES...');
+    const { transaction_hash: tx5 } = await account.execute([
+      {
+        contractAddress: adkesAddress,
+        entrypoint: 'grant_role',
+        calldata: [MINTER_ROLE, swapAddress],
+      },
+    ]);
+    console.log('Transaction hash:', tx5);
+    await provider.waitForTransaction(tx5);
+    console.log('✅ MINTER_ROLE granted on ADKES');
+
+    // Grant BURNER_ROLE to swap contract on ADKES
+    console.log('\n6. Granting BURNER_ROLE on ADKES...');
+    const { transaction_hash: tx6 } = await account.execute([
+      {
+        contractAddress: adkesAddress,
+        entrypoint: 'grant_role',
+        calldata: [BURNER_ROLE, swapAddress],
+      },
+    ]);
+    console.log('Transaction hash:', tx6);
+    await provider.waitForTransaction(tx6);
+    console.log('✅ BURNER_ROLE granted on ADKES');
+
+    // Grant MINTER_ROLE to swap contract on ADGHS
+    console.log('\n7. Granting MINTER_ROLE on ADGHS...');
+    const { transaction_hash: tx7 } = await account.execute([
+      {
+        contractAddress: adghsAddress,
+        entrypoint: 'grant_role',
+        calldata: [MINTER_ROLE, swapAddress],
+      },
+    ]);
+    console.log('Transaction hash:', tx7);
+    await provider.waitForTransaction(tx7);
+    console.log('✅ MINTER_ROLE granted on ADGHS');
+
+    // Grant BURNER_ROLE to swap contract on ADGHS
+    console.log('\n8. Granting BURNER_ROLE on ADGHS...');
+    const { transaction_hash: tx8 } = await account.execute([
+      {
+        contractAddress: adghsAddress,
+        entrypoint: 'grant_role',
+        calldata: [BURNER_ROLE, swapAddress],
+      },
+    ]);
+    console.log('Transaction hash:', tx8);
+    await provider.waitForTransaction(tx8);
+    console.log('✅ BURNER_ROLE granted on ADGHS');
+
+    // Grant MINTER_ROLE to swap contract on ADZAR
+    console.log('\n9. Granting MINTER_ROLE on ADZAR...');
+    const { transaction_hash: tx9 } = await account.execute([
+      {
+        contractAddress: adzarAddress,
+        entrypoint: 'grant_role',
+        calldata: [MINTER_ROLE, swapAddress],
+      },
+    ]);
+    console.log('Transaction hash:', tx9);
+    await provider.waitForTransaction(tx9);
+    console.log('✅ MINTER_ROLE granted on ADZAR');
+
+    // Grant BURNER_ROLE to swap contract on ADZAR
+    console.log('\n10. Granting BURNER_ROLE on ADZAR...');
+    const { transaction_hash: tx10 } = await account.execute([
+      {
+        contractAddress: adzarAddress,
+        entrypoint: 'grant_role',
+        calldata: [BURNER_ROLE, swapAddress],
+      },
+    ]);
+    console.log('Transaction hash:', tx10);
+    await provider.waitForTransaction(tx10);
+    console.log('✅ BURNER_ROLE granted on ADZAR');
 
     console.log('\n✅ All roles granted successfully!');
   } catch (error: unknown) {

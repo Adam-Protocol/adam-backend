@@ -19,13 +19,23 @@ export class SwapController {
   }
 
   @Get('rate')
-  @ApiOperation({ summary: 'Get live USD/NGN rate' })
+  @ApiOperation({ summary: 'Get live USD/NGN rate (legacy)' })
   @ApiResponse({
     status: 200,
     description: 'Returns { usd_ngn, updated_at, source }',
   })
   getRate() {
     return this.swapService.getLiveRate();
+  }
+
+  @Get('rates')
+  @ApiOperation({ summary: 'Get all currency rates (USD to NGN, KES, GHS, ZAR)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns rates for all supported currencies',
+  })
+  getAllRates() {
+    return this.swapService.getAllRates();
   }
 
   @Get('rate/source')

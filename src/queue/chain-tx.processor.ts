@@ -57,6 +57,10 @@ export class ChainTxProcessor extends WorkerHost {
         );
       case 'push-rate':
         return this.processRateUpdate(job.data as { usd_ngn: number });
+      case 'push-rates':
+        return this.processMultiCurrencyRateUpdate(
+          job.data as { rates: Record<string, number> },
+        );
       default:
         this.logger.warn(`Unknown job: ${job.name}`);
     }
@@ -159,7 +163,6 @@ export class ChainTxProcessor extends WorkerHost {
     token_out: string;
     commitment: string;
   }) {
-    console.log('data', data);
     const { transactionId, amount_in, token_out, commitment } = data;
 
     try {
@@ -169,11 +172,21 @@ export class ChainTxProcessor extends WorkerHost {
       });
 
       const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
-      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
-      const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
       const usdcAddress = this.config.get<string>('USDC_ADDRESS');
-      const tokenOutAddress =
-        token_out === 'adusd' ? adusdAddress : adngnAddress;
+
+      // Map token names to addresses
+      const tokenAddresses: Record<string, string> = {
+        adusd: this.config.get<string>('ADUSD_ADDRESS')!,
+        adngn: this.config.get<string>('ADNGN_ADDRESS')!,
+        adkes: this.config.get<string>('ADKES_ADDRESS')!,
+        adghs: this.config.get<string>('ADGHS_ADDRESS')!,
+        adzar: this.config.get<string>('ADZAR_ADDRESS')!,
+      };
+
+      const tokenOutAddress = tokenAddresses[token_out.toLowerCase()];
+      if (!tokenOutAddress) {
+        throw new Error(`Unknown token: ${token_out}`);
+      }
 
       const amountU256 = uint256.bnToUint256(BigInt(amount_in));
 
@@ -235,10 +248,26 @@ export class ChainTxProcessor extends WorkerHost {
       });
 
       const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
-      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
-      const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
-      const tokenInAddr = token_in === 'adusd' ? adusdAddress : adngnAddress;
-      const tokenOutAddr = token_out === 'adusd' ? adusdAddress : adngnAddress;
+
+      // Map token names to addresses
+      const tokenAddresses: Record<string, string> = {
+        adusd: this.config.get<string>('ADUSD_ADDRESS')!,
+        adngn: this.config.get<string>('ADNGN_ADDRESS')!,
+        adkes: this.config.get<string>('ADKES_ADDRESS')!,
+        adghs: this.config.get<string>('ADGHS_ADDRESS')!,
+        adzar: this.config.get<string>('ADZAR_ADDRESS')!,
+      };
+
+      const tokenInAddr = tokenAddresses[token_in.toLowerCase()];
+      const tokenOutAddr = tokenAddresses[token_out.toLowerCase()];
+
+      if (!tokenInAddr) {
+        throw new Error(`Unknown token_in: ${token_in}`);
+      }
+      if (!tokenOutAddr) {
+        throw new Error(`Unknown token_out: ${token_out}`);
+      }
+
       const amountInU256 = uint256.bnToUint256(BigInt(amount_in));
       const minOutU256 = uint256.bnToUint256(BigInt(min_amount_out));
 
@@ -317,6 +346,81 @@ export class ChainTxProcessor extends WorkerHost {
       this.logger.log(`Rate updated on-chain: 1 ADUSD = ${usd_ngn} ADNGN`);
     } catch (err: unknown) {
       this.logger.error('Rate update on-chain failed', err);
+      throw err;
+    }
+  }
+
+  private async processMultiCurrencyRateUpdate(data: {
+    rates: Record<string, number>;
+  }) {
+    try {
+      const { rates } = data;
+      const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
+      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
+
+      // Map of currency code to token address
+      const tokenAddresses: Record<string, string> = {
+        NGN: this.config.get<string>('ADNGN_ADDRESS')!,
+        KES: this.config.get<string>('ADKES_ADDRESS')!,
+        GHS: this.config.get<string>('ADGHS_ADDRESS')!,
+        ZAR: this.config.get<string>('ADZAR_ADDRESS')!,
+      };
+
+      const calls: Array<{
+        contractAddress: string;
+        entrypoint: string;
+        calldata: string[];
+      }> = [];
+
+      // Set rates for each currency pair
+      for (const [currency, rate] of Object.entries(rates)) {
+        const tokenAddress = tokenAddresses[currency];
+        if (!tokenAddress) {
+          this.logger.warn(`No token address configured for ${currency}`);
+          continue;
+        }
+
+        // rate scaled by 1e18: how many AD{CURRENCY} wei per 1 ADUSD wei
+        const rateBigInt = BigInt(Math.round(rate * 1e18));
+        const rateU256 = uint256.bnToUint256(rateBigInt);
+        const inverseRateBigInt = BigInt(Math.round((1 / rate) * 1e18));
+        const inverseU256 = uint256.bnToUint256(inverseRateBigInt);
+
+        // ADUSD -> AD{CURRENCY}
+        calls.push({
+          contractAddress: swapAddress!,
+          entrypoint: 'set_rate',
+          calldata: [
+            adusdAddress!,
+            tokenAddress,
+            rateU256.low.toString(),
+            rateU256.high.toString(),
+          ],
+        });
+
+        // AD{CURRENCY} -> ADUSD
+        calls.push({
+          contractAddress: swapAddress!,
+          entrypoint: 'set_rate',
+          calldata: [
+            tokenAddress,
+            adusdAddress!,
+            inverseU256.low.toString(),
+            inverseU256.high.toString(),
+          ],
+        });
+
+        this.logger.log(`Rate prepared: 1 ADUSD = ${rate} ${currency}`);
+      }
+
+      if (calls.length > 0) {
+        await this.starknet.execute(calls);
+        this.logger.log(
+          `Multi-currency rates updated on-chain for ${Object.keys(rates).join(', ')}`,
+        );
+      }
+    } catch (err: unknown) {
+      this.logger.error('Multi-currency rate update on-chain failed', err);
       throw err;
     }
   }
