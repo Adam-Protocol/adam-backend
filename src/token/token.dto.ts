@@ -85,11 +85,22 @@ export class SellTokenDto {
   nullifier: string;
 
   @ApiProperty({
-    description: 'Commitment hash (computed client-side)',
-    example: '0x...',
+    description: 'Array of ZK proof elements',
+    example: ['0x123...', '0x456...'],
+    type: [String],
   })
-  @IsString()
-  commitment: string;
+  @IsOptional()
+  @IsString({ each: true })
+  proof?: string[];
+
+  @ApiProperty({
+    description: 'Array of new commitments (e.g. for change)',
+    example: ['0x...', '0x...'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsString({ each: true })
+  new_commitments?: string[];
 
   @ApiProperty({ description: 'Target currency', enum: ['NGN', 'USD'] })
   @IsIn(['NGN', 'USD'])
