@@ -12,6 +12,7 @@ import { SwapModule } from './swap/swap.module';
 import { OfframpModule } from './offramp/offramp.module';
 import { ActivityModule } from './activity/activity.module';
 import { QueueModule } from './queue/queue.module';
+import { PrivacyModule } from './privacy/privacy.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { QueueModule } from './queue/queue.module';
     SwapModule,
     OfframpModule,
     ActivityModule,
+    PrivacyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
