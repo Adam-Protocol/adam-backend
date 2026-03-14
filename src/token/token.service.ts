@@ -3,8 +3,28 @@ import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import { StarknetService } from '../starknet/starknet.service';
+import { ChainManagerService, ChainType } from '../common/providers/chain-manager.service';
 import { BuyTokenDto, SellTokenDto } from './token.dto';
+
+/** Token contract addresses keyed by chain then by symbol */
+const CHAIN_TOKEN_ADDRESSES: Record<string, Record<string, string | undefined>> = {
+  [ChainType.STARKNET]: {
+    ADUSD: process.env.ADUSD_ADDRESS,
+    ADNGN: process.env.ADNGN_ADDRESS,
+    ADKES: process.env.ADKES_ADDRESS,
+    ADGHS: process.env.ADGHS_ADDRESS,
+    ADZAR: process.env.ADZAR_ADDRESS,
+    USDC:  process.env.USDC_ADDRESS,
+  },
+  [ChainType.STACKS]: {
+    ADUSD: process.env.STACKS_ADUSD_ADDRESS,
+    ADNGN: process.env.STACKS_ADNGN_ADDRESS,
+    ADKES: process.env.STACKS_ADKES_ADDRESS,
+    ADGHS: process.env.STACKS_ADGHS_ADDRESS,
+    ADZAR: process.env.STACKS_ADZAR_ADDRESS,
+    USDC:  process.env.STACKS_USDC_ADDRESS,
+  },
+};
 
 @Injectable()
 export class TokenService {
@@ -13,7 +33,7 @@ export class TokenService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly starknet: StarknetService,
+    private readonly chainManager: ChainManagerService,
     @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
   ) {}
 
@@ -141,74 +161,41 @@ export class TokenService {
     return { transaction_id: tx.id, status: tx.status, tx_hash: tx.tx_hash };
   }
 
-  /** Get token balances for a wallet */
-  async getBalances(wallet: string) {
+  /** Get token balances for a wallet on the specified chain */
+  async getBalances(wallet: string, chain: string = ChainType.STARKNET) {
+    const normalizedChain = chain.toUpperCase();
+    const provider = this.chainManager.getProvider(normalizedChain);
+    const tokenAddresses = CHAIN_TOKEN_ADDRESSES[normalizedChain];
+
+    if (!tokenAddresses) {
+      throw new BadRequestException(`Unsupported chain: ${chain}`);
+    }
+
     try {
-      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
-      const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
-      const adkesAddress = this.config.get<string>('ADKES_ADDRESS');
-      const adghsAddress = this.config.get<string>('ADGHS_ADDRESS');
-      const adzarAddress = this.config.get<string>('ADZAR_ADDRESS');
-      const usdcAddress = this.config.get<string>('USDC_ADDRESS');
-
-      if (!adusdAddress || !adngnAddress) {
-        throw new Error('Token addresses not configured');
-      }
-
-      const [adusdBalance, adngnBalance, adkesBalance, adghsBalance, adzarBalance, usdcBalance] = await Promise.all([
-        this.starknet.getBalance(adusdAddress, wallet),
-        this.starknet.getBalance(adngnAddress, wallet),
-        adkesAddress ? this.starknet.getBalance(adkesAddress, wallet) : Promise.resolve(0n),
-        adghsAddress ? this.starknet.getBalance(adghsAddress, wallet) : Promise.resolve(0n),
-        adzarAddress ? this.starknet.getBalance(adzarAddress, wallet) : Promise.resolve(0n),
-        usdcAddress ? this.starknet.getBalance(usdcAddress, wallet) : Promise.resolve(0n),
-      ]);
-
-      // All Adam tokens have 18 decimals, USDC has 6 decimals
-      const adusdFormatted = Number(adusdBalance) / 1e18;
-      const adngnFormatted = Number(adngnBalance) / 1e18;
-      const adkesFormatted = Number(adkesBalance) / 1e18;
-      const adghsFormatted = Number(adghsBalance) / 1e18;
-      const adzarFormatted = Number(adzarBalance) / 1e18;
-      const usdcFormatted = Number(usdcBalance) / 1e6;
-
-      return {
-        wallet,
-        balances: {
-          adusd: {
-            raw: adusdBalance.toString(),
-            formatted: adusdFormatted.toFixed(2),
-            decimals: 18,
-          },
-          adngn: {
-            raw: adngnBalance.toString(),
-            formatted: adngnFormatted.toFixed(2),
-            decimals: 18,
-          },
-          adkes: {
-            raw: adkesBalance.toString(),
-            formatted: adkesFormatted.toFixed(2),
-            decimals: 18,
-          },
-          adghs: {
-            raw: adghsBalance.toString(),
-            formatted: adghsFormatted.toFixed(2),
-            decimals: 18,
-          },
-          adzar: {
-            raw: adzarBalance.toString(),
-            formatted: adzarFormatted.toFixed(2),
-            decimals: 18,
-          },
-          usdc: {
-            raw: usdcBalance.toString(),
-            formatted: usdcFormatted.toFixed(2),
-            decimals: 6,
-          },
-        },
+      const tokens = ['ADUSD', 'ADNGN', 'ADKES', 'ADGHS', 'ADZAR', 'USDC'];
+      const decimalsMap: Record<string, number> = {
+        ADUSD: 18, ADNGN: 18, ADKES: 18, ADGHS: 18, ADZAR: 18, USDC: 6,
       };
+
+      const balances = await Promise.all(
+        tokens.map((symbol) => {
+          const address = tokenAddresses[symbol];
+          if (!address) return Promise.resolve(0n);
+          return provider.getBalance(address, wallet);
+        }),
+      );
+
+      const result: Record<string, { raw: string; formatted: string; decimals: number }> = {};
+      tokens.forEach((symbol, i) => {
+        const decimals = decimalsMap[symbol];
+        const raw = balances[i];
+        const formatted = (Number(raw) / 10 ** decimals).toFixed(2);
+        result[symbol.toLowerCase()] = { raw: raw.toString(), formatted, decimals };
+      });
+
+      return { wallet, chain: normalizedChain, balances: result };
     } catch (error) {
-      this.logger.error(`Failed to fetch balances for ${wallet}`, error);
+      this.logger.error(`Failed to fetch balances for ${wallet} on ${chain}`, error);
       throw error;
     }
   }

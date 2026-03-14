@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TokenService } from './token.service';
 import { BuyTokenDto, SellTokenDto } from './token.dto';
 
@@ -26,9 +26,10 @@ export class TokenController {
 
   @Get('balances/:wallet')
   @ApiOperation({ summary: 'Get token balances for a wallet' })
-  @ApiResponse({ status: 200, description: 'Returns ADUSD and ADNGN balances' })
-  getBalances(@Param('wallet') wallet: string) {
-    return this.tokenService.getBalances(wallet);
+  @ApiQuery({ name: 'chain', enum: ['STARKNET', 'STACKS'], required: false, description: 'Chain to query balances on. Defaults to STARKNET.' })
+  @ApiResponse({ status: 200, description: 'Returns token balances for the specified chain' })
+  getBalances(@Param('wallet') wallet: string, @Query('chain') chain?: string) {
+    return this.tokenService.getBalances(wallet, chain);
   }
 
   @Get('commitments/:wallet')
