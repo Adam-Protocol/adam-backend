@@ -23,13 +23,13 @@ async function bootstrap() {
     .setTitle('Adam Protocol API')
     .setDescription('Privacy-first stablecoin offramp on Starknet')
     .setVersion('1.0')
-    .addTag('token', 'Buy and sell ADUSD / ADNGN')
-    .addTag('swap', 'Swap between ADUSD and ADNGN')
+    .addTag('token', 'Buy and sell ADUSD / ADNGN / ADKES / ADZAR / ADGHS')
+    .addTag('swap', 'Swap between Adams stablecoins')
     .addTag('offramp', 'Bank transfer status and webhooks')
     .addTag('activity', 'Transaction history per wallet')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT ?? 4000;
   await app.listen(port);

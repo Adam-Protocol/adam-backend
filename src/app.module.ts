@@ -12,6 +12,7 @@ import { SwapModule } from './swap/swap.module';
 import { OfframpModule } from './offramp/offramp.module';
 import { ActivityModule } from './activity/activity.module';
 import { QueueModule } from './queue/queue.module';
+import { StacksModule } from './stacks/stacks.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { QueueModule } from './queue/queue.module';
     PrismaModule,
     CommonModule,
     StarknetModule,
+    StacksModule,
     QueueModule,
     TokenModule,
     SwapModule,
