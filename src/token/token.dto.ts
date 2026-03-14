@@ -7,6 +7,9 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export const SUPPORTED_CHAINS = ['STARKNET', 'STACKS'] as const;
+export type SupportedChain = typeof SUPPORTED_CHAINS[number];
+
 export class BuyTokenDto {
   @ApiPropertyOptional({
     description: 'Custom transaction ID (optional)',
@@ -16,7 +19,7 @@ export class BuyTokenDto {
   @IsString()
   transactionId?: string;
 
-  @ApiProperty({ description: 'Starknet wallet address', example: '0x049...' })
+  @ApiProperty({ description: 'Wallet address (format depends on chain)', example: '0x049...' })
   @IsString()
   wallet: string;
 
@@ -48,6 +51,15 @@ export class BuyTokenDto {
   @IsOptional()
   @IsString()
   tx_hash?: string;
+
+  @ApiPropertyOptional({
+    description: 'Source chain. Defaults to STARKNET.',
+    enum: ['STARKNET', 'STACKS'],
+    default: 'STARKNET',
+  })
+  @IsOptional()
+  @IsIn(['STARKNET', 'STACKS'])
+  chain?: SupportedChain;
 }
 
 export class SellTokenDto {
@@ -59,7 +71,7 @@ export class SellTokenDto {
   @IsString()
   transactionId?: string;
 
-  @ApiProperty({ description: 'Starknet wallet address', example: '0x049...' })
+  @ApiProperty({ description: 'Wallet address (format depends on chain)', example: '0x049...' })
   @IsString()
   wallet: string;
 
@@ -111,4 +123,13 @@ export class SellTokenDto {
   @IsOptional()
   @IsString()
   tx_hash?: string;
+
+  @ApiPropertyOptional({
+    description: 'Source chain. Defaults to STARKNET.',
+    enum: ['STARKNET', 'STACKS'],
+    default: 'STARKNET',
+  })
+  @IsOptional()
+  @IsIn(['STARKNET', 'STACKS'])
+  chain?: SupportedChain;
 }
