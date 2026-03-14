@@ -1,9 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Account, Contract, RpcProvider, uint256, constants } from 'starknet';
+import {
+  IChainProvider,
+  ExecuteTransactionDto,
+} from '../common/interfaces/chain-provider.interface';
 
 @Injectable()
-export class StarknetService {
+export class StarknetService implements IChainProvider {
   private readonly logger = new Logger(StarknetService.name);
   private readonly provider: RpcProvider;
   private readonly account: Account | null;
@@ -67,6 +71,19 @@ export class StarknetService {
   }
 
   /**
+   * Execute a single transaction (IChainProvider implementation)
+   */
+  async executeTransaction(payload: ExecuteTransactionDto): Promise<string> {
+    return this.execute([
+      {
+        contractAddress: payload.contractAddress,
+        entrypoint: payload.functionName,
+        calldata: payload.calldata as string[],
+      },
+    ]);
+  }
+
+  /**
    * Submit a transaction and return the tx hash.
    * Used by the queue processors.
    */
@@ -88,9 +105,17 @@ export class StarknetService {
       await this.provider.waitForTransaction(transaction_hash);
       return transaction_hash;
     } catch (error) {
-      this.logger.error('Transaction execution failed', error);
-      throw error;
+      // this.logger.error('Transaction execution failed', error);
+      throw error?.baseError?.message;
     }
+  }
+
+  /** Normalize an address string to its standard format */
+  normalizeAddress(address: string): string {
+    // Basic formatting: lowercased, ensures 0x prefix. More strict normalization could use Starknet core utils.
+    return address.toLowerCase().startsWith('0x')
+      ? address.toLowerCase()
+      : `0x${address.toLowerCase()}`;
   }
 
   /** Convert a u256 amount to a pair of felts for contract calls */
