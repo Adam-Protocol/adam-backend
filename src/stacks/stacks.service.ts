@@ -40,13 +40,26 @@ export class StacksService implements IChainProvider {
 
   async getBalance(tokenAddress: string, accountAddress: string): Promise<bigint> {
     try {
+      console.log('Fetching balance for:', { tokenAddress, accountAddress });
+      console.log('Network:', this.network.client.baseUrl);
+      
+      // Stacks addresses can start with SP (mainnet) or ST (testnet)
+      if (!accountAddress.startsWith('SP') && !accountAddress.startsWith('ST')) {
+        throw new Error('Invalid Stacks address');
+      }
+      
       const resp = await fetch(
         `${this.network.client.baseUrl}/extended/v1/address/${accountAddress}/balances`,
       );
+
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch balances: ${resp.statusText}`);
+      }
+
       const data = (await resp.json()) as any;
 
       if (tokenAddress === 'native') {
-        return BigInt(data.stx.balance);
+        return BigInt(data.stx.balance || '0');
       }
 
       // For SIP-010 Tokens (ADKES, ADGHS, ADZAR, etc.)
@@ -59,6 +72,16 @@ export class StacksService implements IChainProvider {
         return BigInt(ftBalance.balance);
       }
 
+      // Also check for other token names (like USDC which might use different naming)
+      // Try to find any matching token by contract address
+      const contractPrefix = tokenAddress.toLowerCase();
+      for (const [key, value] of Object.entries(data.fungible_tokens || {})) {
+        if (key.toLowerCase().startsWith(contractPrefix)) {
+          return BigInt((value as any).balance);
+        }
+      }
+
+      this.logger.warn(`No balance found for token ${tokenAddress} at address ${accountAddress}`);
       return 0n;
     } catch (err) {
       this.logger.error(
