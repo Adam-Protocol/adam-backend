@@ -174,12 +174,22 @@ export class TokenService {
     try {
       const tokens = ['ADUSD', 'ADNGN', 'ADKES', 'ADGHS', 'ADZAR', 'USDC'];
       const decimalsMap: Record<string, number> = {
-        ADUSD: 18, ADNGN: 18, ADKES: 18, ADGHS: 18, ADZAR: 18, USDC: 6,
+        ADUSD: 6, ADNGN: 6, ADKES: 6, ADGHS: 6, ADZAR: 6, USDC: 6,
       };
+
+      // Add STX for Stacks chain
+      if (normalizedChain === ChainType.STACKS) {
+        tokens.push('STX');
+        decimalsMap['STX'] = 6;
+      }
 
       const balances = await Promise.all(
         tokens.map((symbol) => {
           const address = tokenAddresses[symbol];
+          // For STX, use 'native' as the token address
+          if (symbol === 'STX') {
+            return provider.getBalance('native', wallet);
+          }
           if (!address) return Promise.resolve(0n);
           return provider.getBalance(address, wallet);
         }),
