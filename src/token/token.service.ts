@@ -173,9 +173,14 @@ export class TokenService {
 
     try {
       const tokens = ['ADUSD', 'ADNGN', 'ADKES', 'ADGHS', 'ADZAR', 'USDC'];
-      const decimalsMap: Record<string, number> = {
-        ADUSD: 6, ADNGN: 6, ADKES: 6, ADGHS: 6, ADZAR: 6, USDC: 6,
-      };
+      
+      // Decimals are chain-specific
+      // Starknet: ADUSD/ADNGN/ADKES/ADGHS/ADZAR have 18 decimals, USDC has 6
+      // Stacks: All tokens have 6 decimals
+      const decimalsMap: Record<string, number> = 
+        normalizedChain === ChainType.STARKNET
+          ? { ADUSD: 18, ADNGN: 18, ADKES: 18, ADGHS: 18, ADZAR: 18, USDC: 6 }
+          : { ADUSD: 6, ADNGN: 6, ADKES: 6, ADGHS: 6, ADZAR: 6, USDC: 6 };
 
       // Add STX for Stacks chain
       if (normalizedChain === ChainType.STACKS) {
@@ -199,7 +204,7 @@ export class TokenService {
       tokens.forEach((symbol, i) => {
         const decimals = decimalsMap[symbol];
         const raw = balances[i];
-        const formatted = (Number(raw) / 10 ** decimals).toFixed(2);
+        const formatted = (Number(raw) / 10 ** decimals).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         result[symbol.toLowerCase()] = { raw: raw.toString(), formatted, decimals };
       });
 
