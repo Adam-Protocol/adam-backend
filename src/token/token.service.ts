@@ -22,7 +22,7 @@ const CHAIN_TOKEN_ADDRESSES: Record<string, Record<string, string | undefined>> 
     ADKES: process.env.STACKS_ADKES_ADDRESS,
     ADGHS: process.env.STACKS_ADGHS_ADDRESS,
     ADZAR: process.env.STACKS_ADZAR_ADDRESS,
-    USDC:  process.env.STACKS_USDC_ADDRESS,
+    USDC:  process.env.STACKS_USDCx_ADDRESS,
   },
 };
 
