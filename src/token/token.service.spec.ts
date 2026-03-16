@@ -3,6 +3,8 @@ import { TokenService } from './token.service';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
+import { StarknetService } from '../starknet/starknet.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('TokenService', () => {
   let service: TokenService;
@@ -19,12 +21,17 @@ describe('TokenService', () => {
     },
   };
 
+  const mockStarknet = {
+    getBalance: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TokenService,
-        { provide: 'PrismaService', useValue: mockPrisma },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: StarknetService, useValue: mockStarknet },
         { provide: getQueueToken('chain-tx'), useValue: mockQueue },
       ],
     }).compile();
@@ -46,10 +53,10 @@ describe('TokenService', () => {
       commitment: '0xcommit1',
     };
 
-    it('should create a pending transaction and enqueue buy job', async () => {
-      mockPrisma.transaction.findUnique.mockResolvedValue(null);
+    it('should create a pending transaction', async () => {
+      mockPrisma.transaction.findFirst.mockResolvedValue(null);
 
-      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-1' } as any);
+      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-1', status: 'pending' } as any);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const result = await service.buy(buyDto as any);
@@ -64,22 +71,16 @@ describe('TokenService', () => {
         }),
       );
 
-      expect(mockQueue.add).toHaveBeenCalledWith(
-        'submit-buy',
-        expect.any(Object),
-        expect.any(Object),
-      );
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect((result as any).status).toBe('pending');
     });
 
     it('should throw BadRequestException if commitment already exists', async () => {
-      mockPrisma.transaction.findUnique.mockResolvedValue({
+      mockPrisma.transaction.findFirst.mockResolvedValue({
         id: 'existing-tx',
       });
 
       await expect(service.buy(buyDto)).rejects.toThrow(BadRequestException);
-      expect(mockQueue.add).not.toHaveBeenCalled();
     });
   });
 
@@ -89,16 +90,16 @@ describe('TokenService', () => {
       token_in: 'adngn' as const,
       amount: '1000000000000000000',
       nullifier: '0xnull1',
-      commitment: '0xcommit2',
+      new_commitments: ['0xcommit2'],
       currency: 'NGN' as const,
       bank_account: '0123456789',
       bank_code: '044',
     };
 
-    it('should create a pending sell transaction and enqueue job', async () => {
+    it('should create a pending sell transaction', async () => {
       mockPrisma.transaction.findFirst.mockResolvedValue(null);
 
-      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-2' } as any);
+      mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-2', status: 'pending' } as any);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const result = await service.sell(sellDto as any);
@@ -108,16 +109,12 @@ describe('TokenService', () => {
           data: expect.objectContaining({
             type: 'sell',
             nullifier: '0xnull1',
+            commitment: '0xcommit2',
             bank_account: '0123456789',
           }),
         }),
       );
 
-      expect(mockQueue.add).toHaveBeenCalledWith(
-        'submit-sell',
-        expect.any(Object),
-        expect.any(Object),
-      );
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect((result as any).status).toBe('pending');
     });

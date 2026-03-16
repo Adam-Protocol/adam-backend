@@ -37,11 +37,27 @@ export class SwapDto {
   min_amount_out: string;
 
   @ApiProperty({
-    description: 'Commitment hash (computed client-side)',
+    description: 'Nullifier hash of the spent note (computed client-side)',
+    example: '0x...',
+  })
+  @IsString()
+  nullifier: string;
+
+  @ApiProperty({
+    description: 'Commitment hash for the new note (computed client-side)',
     example: '0x...',
   })
   @IsString()
   commitment: string;
+
+  @ApiProperty({
+    description: 'Array of ZK proof elements',
+    example: ['0x123...', '0x456...'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsString({ each: true })
+  proof?: string[];
 
   @ApiPropertyOptional({
     description: 'Transaction hash from frontend execution',

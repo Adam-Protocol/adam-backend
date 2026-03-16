@@ -76,6 +76,13 @@ export class TokenService {
       throw new BadRequestException('Nullifier already spent');
     }
 
+    // Since a sell can return multiple change commitments or none, 
+    // we take the first one to satisfy the DB schema, or use a placeholder if empty.
+    const primaryCommitment =
+      dto.new_commitments && dto.new_commitments.length > 0
+        ? dto.new_commitments[0]
+        : '0x0';
+
     // Use custom transactionId if provided, otherwise let Prisma generate one
     const txData: {
       wallet: string;
@@ -93,7 +100,7 @@ export class TokenService {
     } = {
       wallet: dto.wallet,
       type: 'sell',
-      commitment: dto.commitment,
+      commitment: primaryCommitment,
       nullifier: dto.nullifier,
       token_in: dto.token_in.toUpperCase(),
       token_out: 'FIAT',

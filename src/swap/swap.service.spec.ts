@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SwapService } from './swap.service';
 import { ConfigService } from '@nestjs/config';
 import { getQueueToken } from '@nestjs/bullmq';
+import { FlutterwaveService } from '../offramp/flutterwave.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('SwapService', () => {
   let service: SwapService;
@@ -15,6 +17,10 @@ describe('SwapService', () => {
       create: jest.fn(),
       findFirst: jest.fn(),
     },
+  };
+
+  const mockFlutterwave = {
+    getExchangeRate: jest.fn(),
   };
 
   const mockConfig = {
@@ -31,8 +37,9 @@ describe('SwapService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SwapService,
-        { provide: 'PrismaService', useValue: mockPrisma },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: FlutterwaveService, useValue: mockFlutterwave },
         { provide: getQueueToken('chain-tx'), useValue: mockQueue },
       ],
     }).compile();
@@ -54,8 +61,9 @@ describe('SwapService', () => {
     expect(rate.usd_ngn).toBe(1600);
   });
 
-  it('should create a transaction and enqueue swap job', async () => {
-    mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-1' } as any);
+  it('should create a transaction', async () => {
+    mockPrisma.transaction.findFirst.mockResolvedValue(null);
+    mockPrisma.transaction.create.mockResolvedValue({ id: 'tx-1', status: 'pending' } as any);
     // Inject cached rate so no HTTP call is made
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     (service as any).cachedRate = { usd_ngn: 1600, updated_at: new Date() };
@@ -67,6 +75,7 @@ describe('SwapService', () => {
       amount_in: '1000000000000000000',
       token_out: 'adngn',
       min_amount_out: '1590000000000000000',
+      nullifier: '0xnullifier',
       commitment: '0xabc',
     } as any);
 
@@ -75,15 +84,11 @@ describe('SwapService', () => {
         data: expect.objectContaining({
           type: 'swap',
           commitment: '0xabc',
+          nullifier: '0xnullifier',
         }),
       }),
     );
 
-    expect(mockQueue.add).toHaveBeenCalledWith(
-      'submit-swap',
-      expect.objectContaining({ commitment: '0xabc' }),
-      expect.any(Object),
-    );
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect((result as any).status).toBe('pending');
   });

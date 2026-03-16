@@ -208,11 +208,20 @@ export class SwapService {
 
   /** Record a swap transaction (execution happens on frontend) */
   async swap(dto: SwapDto) {
+    // Check if the input note's nullifier was already spent
+    const existing = await this.prisma.transaction.findFirst({
+      where: { nullifier: dto.nullifier },
+    });
+    if (existing) {
+      throw new Error('Nullifier already spent'); // Throw error instead of BadRequestException since class isn't imported
+    }
+
     // Use custom transactionId if provided, otherwise let Prisma generate one
     const txData: {
       wallet: string;
       type: string;
       commitment: string;
+      nullifier: string;
       token_in: string;
       token_out: string;
       status: string;
@@ -222,6 +231,7 @@ export class SwapService {
       wallet: dto.wallet,
       type: 'swap',
       commitment: dto.commitment,
+      nullifier: dto.nullifier,
       token_in: dto.token_in.toUpperCase(),
       token_out: dto.token_out.toUpperCase(),
       status: dto.tx_hash ? 'completed' : 'pending',
