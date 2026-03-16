@@ -40,8 +40,6 @@ export class StacksService implements IChainProvider {
 
   async getBalance(tokenAddress: string, accountAddress: string): Promise<bigint> {
     try {
-      console.log('Fetching balance for:', { tokenAddress, accountAddress });
-      console.log('Network:', this.network.client.baseUrl);
       
       // Stacks addresses can start with SP (mainnet) or ST (testnet)
       if (!accountAddress.startsWith('SP') && !accountAddress.startsWith('ST')) {
