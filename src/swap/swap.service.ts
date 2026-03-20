@@ -217,6 +217,7 @@ export class SwapService {
       token_out: string;
       status: string;
       tx_hash: string | null;
+      chain: string;
       id?: string;
     } = {
       wallet: dto.wallet,
