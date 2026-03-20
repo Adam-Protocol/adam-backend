@@ -182,8 +182,16 @@ export class SwapService {
       }
 
       // Push all rates on-chain via queue (RATE_SETTER_ROLE backend wallet)
+      // Push to Starknet
       await this.chainTxQueue.add(
         'push-rates',
+        { rates },
+        { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
+      );
+
+      // Push to Stacks
+      await this.chainTxQueue.add(
+        'push-rates-stacks',
         { rates },
         { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
       );

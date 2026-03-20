@@ -4,8 +4,10 @@ import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { StarknetService } from '../starknet/starknet.service';
+import { StacksService } from '../stacks/stacks.service';
 import { FlutterwaveService } from '../offramp/flutterwave.service';
 import { uint256 } from 'starknet';
+import { uintCV, contractPrincipalCV } from '@stacks/transactions';
 
 @Processor('chain-tx')
 export class ChainTxProcessor extends WorkerHost {
@@ -13,6 +15,7 @@ export class ChainTxProcessor extends WorkerHost {
 
   constructor(
     private readonly starknet: StarknetService,
+    private readonly stacks: StacksService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly flutterwave: FlutterwaveService,
@@ -59,6 +62,10 @@ export class ChainTxProcessor extends WorkerHost {
         return this.processRateUpdate(job.data as { usd_ngn: number });
       case 'push-rates':
         return this.processMultiCurrencyRateUpdate(
+          job.data as { rates: Record<string, number> },
+        );
+      case 'push-rates-stacks':
+        return this.processStacksRateUpdate(
           job.data as { rates: Record<string, number> },
         );
       default:
@@ -421,6 +428,135 @@ export class ChainTxProcessor extends WorkerHost {
       }
     } catch (err: unknown) {
       this.logger.error('Multi-currency rate update on-chain failed', err);
+      throw err;
+    }
+  }
+
+  private async processStacksRateUpdate(data: {
+    rates: Record<string, number>;
+  }) {
+    try {
+      const { rates } = data;
+      const swapContractId = this.config.get<string>('STACKS_SWAP_CONTRACT');
+      const deployerAddress = this.config.get<string>('STACKS_DEPLOYER_ADDRESS');
+
+      if (!swapContractId || !deployerAddress) {
+        this.logger.error('Stacks contract configuration missing');
+        throw new Error('Stacks contract configuration missing');
+      }
+
+      // Map of currency code to token contract name
+      const tokenContracts: Record<string, string> = {
+        USD: 'adam-token-adusd-v2',
+        NGN: 'adam-token-adngn-v2',
+        KES: 'adam-token-adkes-v2',
+        GHS: 'adam-token-adghs-v2',
+        ZAR: 'adam-token-adzar-v2',
+      };
+
+      const usdcContract = 'usdcx-v3';
+      const adusdContract = tokenContracts.USD;
+
+      // Convert rates to 6 decimal precision (1e6) for Stacks
+      const convertRate = (rate: number): string => {
+        return Math.round(rate * 1e6).toString();
+      };
+
+      // Prepare all rate update calls
+      const rateCalls: Array<{
+        from: string;
+        to: string;
+        rate: string;
+        label: string;
+      }> = [];
+
+      // USDC <-> ADUSD (1:1)
+      rateCalls.push(
+        {
+          from: usdcContract,
+          to: adusdContract,
+          rate: convertRate(1),
+          label: 'USDC → ADUSD',
+        },
+        {
+          from: adusdContract,
+          to: usdcContract,
+          rate: convertRate(1),
+          label: 'ADUSD → USDC',
+        },
+      );
+
+      // For each currency, set USDC <-> AD{CURRENCY} and ADUSD <-> AD{CURRENCY}
+      for (const [currency, rate] of Object.entries(rates)) {
+        const tokenContract = tokenContracts[currency];
+        if (!tokenContract) {
+          this.logger.warn(`No token contract configured for ${currency}`);
+          continue;
+        }
+
+        const forwardRate = convertRate(rate);
+        const inverseRate = convertRate(1 / rate);
+
+        // USDC <-> AD{CURRENCY}
+        rateCalls.push(
+          {
+            from: usdcContract,
+            to: tokenContract,
+            rate: forwardRate,
+            label: `USDC → AD${currency}`,
+          },
+          {
+            from: tokenContract,
+            to: usdcContract,
+            rate: inverseRate,
+            label: `AD${currency} → USDC`,
+          },
+        );
+
+        // ADUSD <-> AD{CURRENCY}
+        rateCalls.push(
+          {
+            from: adusdContract,
+            to: tokenContract,
+            rate: forwardRate,
+            label: `ADUSD → AD${currency}`,
+          },
+          {
+            from: tokenContract,
+            to: adusdContract,
+            rate: inverseRate,
+            label: `AD${currency} → ADUSD`,
+          },
+        );
+
+        this.logger.log(`Rate prepared: 1 USD = ${rate} ${currency}`);
+      }
+
+      // Execute all rate updates sequentially (Stacks doesn't support batch like Starknet)
+      for (const call of rateCalls) {
+        try {
+          const txid = await this.stacks.executeTransaction({
+            contractAddress: swapContractId,
+            functionName: 'set-rate',
+            calldata: [
+              contractPrincipalCV(deployerAddress, call.from),
+              contractPrincipalCV(deployerAddress, call.to),
+              uintCV(call.rate),
+            ],
+          });
+
+          this.logger.log(`${call.label}: ${call.rate} (txid: ${txid})`);
+        } catch (error) {
+          this.logger.error(`Failed to set rate ${call.label}:`, error);
+          // Continue with other rates even if one fails
+        }
+      }
+
+      this.logger.log(
+        `Stacks rates updated for ${Object.keys(rates).join(', ')}`,
+      );
+    } catch (err: unknown) {
+      this.logger.error('Stacks rate update failed', err);
       throw err;
     }
   }

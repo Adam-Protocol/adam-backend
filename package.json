@@ -28,6 +28,7 @@
     "grant-all-roles": "bash src/scripts/grant-all-roles.sh",
     "test-exchange-api": "bash src/scripts/test-exchange-rate-api.sh",
     "setup-roles": "bash src/scripts/setup-roles.sh",
+    "test-rate-update": "ts-node src/scripts/test-rate-update.ts",
     "verify-roles-sncast": "bash src/scripts/verify-roles-sncast.sh",
     "production-setup": "bash src/scripts/production-setup.sh"
   },
