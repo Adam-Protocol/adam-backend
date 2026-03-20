@@ -27,7 +27,7 @@ export class SwapService {
     private readonly config: ConfigService,
     private readonly flutterwave: FlutterwaveService,
     @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
-  ) {}
+  ) { }
 
   /** Get current default rate source */
   getDefaultRateSource(): RateSource {
@@ -226,6 +226,7 @@ export class SwapService {
       token_out: dto.token_out.toUpperCase(),
       status: dto.tx_hash ? 'completed' : 'pending',
       tx_hash: dto.tx_hash || null,
+      chain: dto.chain || 'STARKNET',
     };
 
     if (dto.transactionId) {

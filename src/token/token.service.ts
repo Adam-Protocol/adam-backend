@@ -14,7 +14,7 @@ const CHAIN_TOKEN_ADDRESSES: Record<string, Record<string, string | undefined>> 
     ADKES: process.env.ADKES_ADDRESS,
     ADGHS: process.env.ADGHS_ADDRESS,
     ADZAR: process.env.ADZAR_ADDRESS,
-    USDC:  process.env.USDC_ADDRESS,
+    USDC: process.env.USDC_ADDRESS,
   },
   [ChainType.STACKS]: {
     ADUSD: process.env.STACKS_ADUSD_ADDRESS,
@@ -22,7 +22,7 @@ const CHAIN_TOKEN_ADDRESSES: Record<string, Record<string, string | undefined>> 
     ADKES: process.env.STACKS_ADKES_ADDRESS,
     ADGHS: process.env.STACKS_ADGHS_ADDRESS,
     ADZAR: process.env.STACKS_ADZAR_ADDRESS,
-    USDC:  process.env.STACKS_USDCx_ADDRESS,
+    USDC: process.env.STACKS_USDCx_ADDRESS,
   },
 };
 
@@ -35,7 +35,7 @@ export class TokenService {
     private readonly config: ConfigService,
     private readonly chainManager: ChainManagerService,
     @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
-  ) {}
+  ) { }
 
   /** Initiate a buy: validate then record transaction (execution happens on frontend) */
   async buy(dto: BuyTokenDto) {
@@ -62,6 +62,7 @@ export class TokenService {
       token_out: string;
       status: string;
       tx_hash: string | null;
+      chain: string;
       id?: string;
     } = {
       wallet: dto.wallet,
@@ -71,6 +72,7 @@ export class TokenService {
       token_out: dto.token_out.toUpperCase(),
       status: dto.tx_hash ? 'completed' : 'pending',
       tx_hash: dto.tx_hash || null,
+      chain: dto.chain || 'STARKNET',
     };
 
     if (dto.transactionId) {
@@ -109,6 +111,7 @@ export class TokenService {
       currency: string;
       bank_account: string;
       bank_code: string;
+      chain: string;
       id?: string;
     } = {
       wallet: dto.wallet,
@@ -122,6 +125,7 @@ export class TokenService {
       currency: dto.currency,
       bank_account: dto.bank_account,
       bank_code: dto.bank_code,
+      chain: dto.chain || 'STARKNET',
     };
 
     if (dto.transactionId) {
@@ -173,11 +177,11 @@ export class TokenService {
 
     try {
       const tokens = ['ADUSD', 'ADNGN', 'ADKES', 'ADGHS', 'ADZAR', 'USDC'];
-      
+
       // Decimals are chain-specific
       // Starknet: ADUSD/ADNGN/ADKES/ADGHS/ADZAR have 18 decimals, USDC has 6
       // Stacks: All tokens have 6 decimals
-      const decimalsMap: Record<string, number> = 
+      const decimalsMap: Record<string, number> =
         normalizedChain === ChainType.STARKNET
           ? { ADUSD: 18, ADNGN: 18, ADKES: 18, ADGHS: 18, ADZAR: 18, USDC: 6 }
           : { ADUSD: 6, ADNGN: 6, ADKES: 6, ADGHS: 6, ADZAR: 6, USDC: 6 };
@@ -187,7 +191,7 @@ export class TokenService {
         tokens.push('STX');
         decimalsMap['STX'] = 6;
       }
-
+ 
       const balances = await Promise.all(
         tokens.map((symbol) => {
           const address = tokenAddresses[symbol];

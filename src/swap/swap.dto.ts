@@ -1,6 +1,9 @@
 import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export const SUPPORTED_CHAINS = ['STARKNET', 'STACKS'] as const;
+export type SupportedChain = typeof SUPPORTED_CHAINS[number];
+
 export class SwapDto {
   @ApiPropertyOptional({
     description: 'Custom transaction ID (optional)',
@@ -50,4 +53,13 @@ export class SwapDto {
   @IsOptional()
   @IsString()
   tx_hash?: string;
+
+  @ApiPropertyOptional({
+    description: 'Source chain. Defaults to STARKNET.',
+    enum: ['STARKNET', 'STACKS'],
+    default: 'STARKNET',
+  })
+  @IsOptional()
+  @IsIn(['STARKNET', 'STACKS'])
+  chain?: SupportedChain;
 }
