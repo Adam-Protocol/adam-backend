@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getActivity(
     wallet: string,
@@ -30,6 +30,7 @@ export class ActivityService {
           tx_hash: true,
           reference_id: true,
           currency: true,
+          chain: true,
           created_at: true,
           updated_at: true,
           // Note: amount, bank_account NOT returned — privacy

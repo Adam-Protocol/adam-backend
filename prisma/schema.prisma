@@ -14,7 +14,7 @@ datasource db {
 /// Amount intentionally NOT stored — privacy is maintained by commitment scheme.
 model Transaction {
   id           String   @id @default(uuid())
-  wallet       String   // Starknet wallet address
+  wallet       String   // Wallet address (format depends on chain)
   type         String   // buy | sell | swap
   commitment   String   // Commitment hash (can be reused across buy/sell)
   nullifier    String?  @unique // Nullifier prevents double-spending
@@ -27,6 +27,7 @@ model Transaction {
   bank_account String?
   bank_code    String?
   error        String?
+  chain        String   @default("STARKNET") // STARKNET | STACKS
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
 
@@ -34,4 +35,5 @@ model Transaction {
   @@index([commitment])
   @@index([status])
   @@index([nullifier])
+  @@index([chain])
 }
