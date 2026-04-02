@@ -437,7 +437,7 @@ export class ChainTxProcessor extends WorkerHost {
   }) {
     try {
       const { rates } = data;
-      const swapContractId = this.config.get<string>('STACKS_SWAP_CONTRACT');
+      const swapContractId = this.config.get<string>('STACKS_ADAM_SWAP_ADDRESS');
       const deployerAddress = this.config.get<string>('STACKS_DEPLOYER_ADDRESS');
 
       if (!swapContractId || !deployerAddress) {

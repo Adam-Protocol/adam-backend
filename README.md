@@ -1,6 +1,6 @@
 # Adam Protocol Backend
 
-Privacy-first stablecoin API on Starknet. Handles buy/sell/swap transaction queuing, live NGN rate fetching, and bank offramp via Flutterwave.
+Privacy-first multichain stablecoin API supporting Starknet and Stacks. Handles buy/sell/swap transaction queuing, live exchange rate fetching, and bank offramp via Flutterwave.
 
 ## Architecture
 
@@ -9,7 +9,11 @@ Request → Controller → Service → BullMQ Queue (Redis)
                                         ↓
                                ChainTxProcessor
                                         ↓
-                         Starknet RPC (account.execute)
+                    ┌───────────────────┴───────────────────┐
+                    ↓                                       ↓
+         Starknet RPC (account.execute)        Stacks RPC (contract-call)
+                    ↓                                       ↓
+                    └───────────────────┬───────────────────┘
                                         ↓ (on sell success)
                               Flutterwave Transfer API
 ```
@@ -45,10 +49,15 @@ Request → Controller → Service → BullMQ Queue (Redis)
 - Automatic fallback between sources
 - Runtime switching via API endpoints
 
-### 🔒 Privacy-First
+### 🔒 Privacy Features (Starknet)
 - Transaction amounts never stored in database
 - Only commitment hashes and nullifiers on-chain
-- Backend is amount-blind
+- Backend is amount-blind for Starknet transactions
+
+### 🔓 Transparent Transactions (Stacks)
+- Standard blockchain transparency
+- Amounts visible on-chain for regulatory compliance
+- Lower computational overhead
 
 ## Local Setup
 
@@ -87,14 +96,26 @@ See `.env.example` for full list. Key variables:
 ```bash
 # Starknet
 STARKNET_RPC_URL=https://starknet-sepolia.g.alchemy.com/...
-DEPLOYER_PRIVATE_KEY=0x...
-DEPLOYER_ADDRESS=0x...
+STARKNET_DEPLOYER_PRIVATE_KEY=0x...
+STARKNET_DEPLOYER_ADDRESS=0x...
 
-# Contracts (from deployment)
-ADUSD_ADDRESS=0x...
-ADNGN_ADDRESS=0x...
-ADAM_SWAP_ADDRESS=0x...
-USDC_ADDRESS=0x...
+# Starknet Contracts (from deployment)
+STARKNET_ADUSD_ADDRESS=0x...
+STARKNET_ADNGN_ADDRESS=0x...
+STARKNET_ADAM_SWAP_ADDRESS=0x...
+STARKNET_USDC_ADDRESS=0x...
+
+# Stacks
+STACKS_NETWORK=testnet
+STACKS_RPC_URL=https://api.testnet.hiro.so
+STACKS_DEPLOYER_PRIVATE_KEY="your twenty four word mnemonic"
+STACKS_DEPLOYER_ADDRESS=ST...
+
+# Stacks Contracts (from deployment)
+STACKS_ADUSD_ADDRESS=ST....adam-token-adusd
+STACKS_ADNGN_ADDRESS=ST....adam-token-adngn
+STACKS_ADAM_SWAP_ADDRESS=ST....adam-swap-v3
+STACKS_USDC_ADDRESS=ST....usdcx
 
 # Exchange Rate
 EXCHANGE_RATE_API_KEY=your_key

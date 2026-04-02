@@ -37,12 +37,13 @@ export class BuyTokenDto {
   @IsIn(['adusd', 'adngn', 'adkes', 'adghs', 'adzar'])
   token_out: 'adusd' | 'adngn' | 'adkes' | 'adghs' | 'adzar';
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Pedersen commitment hash (computed client-side)',
     example: '0x...',
   })
+  @IsOptional()
   @IsString()
-  commitment: string;
+  commitment?: string;
 
   @ApiPropertyOptional({
     description: 'Transaction hash (if already executed on frontend)',
@@ -89,19 +90,21 @@ export class SellTokenDto {
   @IsNumberString()
   amount: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Nullifier hash (computed client-side)',
     example: '0x...',
   })
+  @IsOptional()
   @IsString()
-  nullifier: string;
+  nullifier?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Commitment hash (computed client-side)',
     example: '0x...',
   })
+  @IsOptional()
   @IsString()
-  commitment: string;
+  commitment?: string;
 
   @ApiProperty({ description: 'Target currency', enum: ['NGN', 'USD', 'KES', 'GHS', 'ZAR'] })
   @IsIn(['NGN', 'USD', 'KES', 'GHS', 'ZAR'])

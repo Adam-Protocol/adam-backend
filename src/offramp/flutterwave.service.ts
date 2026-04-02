@@ -345,7 +345,16 @@ export class FlutterwaveService {
         );
       }
 
-      const rate = response.data.data.rate;
+      let rate = response.data.data.rate;
+      
+      // Fix inversion: Flutterwave sometimes returns "source per destination"
+      // If we ask for USD to NGN and get 0.000632, it's actually 1 NGN = 0.000632 USD.
+      // We want 1 USD = ~1500 NGN.
+      if (from === 'USD' && rate < 1.0 && ['NGN', 'KES', 'GHS', 'ZAR'].includes(to)) {
+        this.logger.warn(`Detected inverted Flutterwave rate for ${to}: ${rate}. Inverting...`);
+        rate = 1 / rate;
+      }
+
       this.logger.log(`Flutterwave rate: 1 ${from} = ${rate} ${to}`);
       return rate;
     } catch (error: unknown) {

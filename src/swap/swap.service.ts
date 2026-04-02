@@ -85,7 +85,13 @@ export class SwapService {
     const rates: Record<
       string,
       { rate: number; updated_at: Date | null; source: RateSource }
-    > = {};
+    > = {
+      USD: {
+        rate: 1.0,
+        updated_at: new Date(),
+        source: this.defaultRateSource,
+      },
+    };
     for (const [currency, data] of this.cachedRates.entries()) {
       rates[currency] = {
         rate: data.rate,

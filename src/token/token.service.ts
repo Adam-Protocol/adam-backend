@@ -40,17 +40,19 @@ export class TokenService {
   /** Initiate a buy: validate then record transaction (execution happens on frontend) */
   async buy(dto: BuyTokenDto) {
     // Check if this exact commitment already exists for a buy transaction
-    // (same commitment can be used for sell, but not for multiple buys)
-    const existing = await this.prisma.transaction.findFirst({
-      where: {
-        commitment: dto.commitment,
-        type: 'buy',
-      },
-    });
-    if (existing) {
-      throw new BadRequestException(
-        'Commitment already used for a buy transaction',
-      );
+    // Skip check if commitment is not provided (e.g., for Stacks)
+    if (dto.commitment) {
+      const existing = await this.prisma.transaction.findFirst({
+        where: {
+          commitment: dto.commitment,
+          type: 'buy',
+        },
+      });
+      if (existing) {
+        throw new BadRequestException(
+          'Commitment already used for a buy transaction',
+        );
+      }
     }
 
     // Use custom transactionId if provided, otherwise let Prisma generate one
@@ -67,7 +69,7 @@ export class TokenService {
     } = {
       wallet: dto.wallet,
       type: 'buy',
-      commitment: dto.commitment,
+      commitment: dto.commitment || '0x0',
       token_in: 'USDC',
       token_out: dto.token_out.toUpperCase(),
       status: dto.tx_hash ? 'completed' : 'pending',
@@ -91,11 +93,14 @@ export class TokenService {
 
   /** Initiate a sell: validate nullifier then trigger bank transfer */
   async sell(dto: SellTokenDto) {
-    const existing = await this.prisma.transaction.findFirst({
-      where: { nullifier: dto.nullifier },
-    });
-    if (existing) {
-      throw new BadRequestException('Nullifier already spent');
+    // Validate nullifier uniqueness only if provided
+    if (dto.nullifier) {
+      const existing = await this.prisma.transaction.findFirst({
+        where: { nullifier: dto.nullifier },
+      });
+      if (existing) {
+        throw new BadRequestException('Nullifier already spent');
+      }
     }
 
     // Use custom transactionId if provided, otherwise let Prisma generate one
@@ -103,7 +108,7 @@ export class TokenService {
       wallet: string;
       type: string;
       commitment: string;
-      nullifier: string;
+      nullifier: string | null;
       token_in: string;
       token_out: string;
       status: string;
@@ -116,8 +121,8 @@ export class TokenService {
     } = {
       wallet: dto.wallet,
       type: 'sell',
-      commitment: dto.commitment,
-      nullifier: dto.nullifier,
+      commitment: dto.commitment || '0x0',
+      nullifier: dto.nullifier || null,
       token_in: dto.token_in.toUpperCase(),
       token_out: 'FIAT',
       status: dto.tx_hash ? 'completed' : 'pending',
