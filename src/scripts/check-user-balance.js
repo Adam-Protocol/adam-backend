@@ -7,7 +7,7 @@ const SWAP_ADDRESS = '0x07984588fbc7ba62d1ac9758841b9884aac028ae2960289ed63bb0dd
 const ERC20_ABI = {
   abi: [
     {
-      name: 'balanceOf',
+      name: 'balance_of',
       type: 'function',
       inputs: [{ name: 'account', type: 'core::starknet::contract_address::ContractAddress' }],
       outputs: [{ type: 'core::integer::u256' }],
@@ -35,7 +35,7 @@ async function checkBalance() {
 
   try {
     // Check balance
-    const balance = await usdcContract.balanceOf(USER_ADDRESS);
+    const balance = await usdcContract.balance_of(USER_ADDRESS);
     const balanceLow = BigInt(balance.low || balance[0] || 0);
     const balanceHigh = BigInt(balance.high || balance[1] || 0);
     const totalBalance = balanceLow + (balanceHigh << 128n);

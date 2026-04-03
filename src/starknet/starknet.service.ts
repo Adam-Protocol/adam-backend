@@ -158,7 +158,7 @@ export class StarknetService implements IChainProvider {
         providerOrAccount: this.provider,
       });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      const result = (await contract.balanceOf(accountAddress)) as
+      const result = (await contract.balance_of(accountAddress)) as
         | bigint
         | { balance?: { low: bigint; high: bigint } | [bigint, bigint] }
         | { low: bigint; high: bigint }

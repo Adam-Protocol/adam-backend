@@ -25,7 +25,7 @@ async function testBalance() {
     
     // Get balances
     console.log('Fetching ADUSD balance...');
-    const adusdResult = await adusdContract.balanceOf(WALLET_ADDRESS);
+    const adusdResult = await adusdContract.balance_of(WALLET_ADDRESS);
     console.log('ADUSD raw result:', adusdResult);
     
     const adusdBalance = adusdResult.balance || adusdResult;
@@ -36,7 +36,7 @@ async function testBalance() {
     console.log('');
     
     console.log('Fetching ADNGN balance...');
-    const adngnResult = await adngnContract.balanceOf(WALLET_ADDRESS);
+    const adngnResult = await adngnContract.balance_of(WALLET_ADDRESS);
     console.log('ADNGN raw result:', adngnResult);
     
     const adngnBalance = adngnResult.balance || adngnResult;

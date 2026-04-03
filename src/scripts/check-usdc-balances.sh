@@ -23,7 +23,7 @@ echo ""
 echo -e "${YELLOW}Checking deployer USDC balance...${NC}"
 DEPLOYER_BALANCE=$(sncast call --url "$STARKNET_RPC_URL" \
     --contract-address "$USDC_ADDRESS" \
-    --function "balanceOf" \
+    --function "balance_of" \
     --calldata "$DEPLOYER_ADDRESS" 2>&1)
 
 if echo "$DEPLOYER_BALANCE" | grep -q "Success"; then
@@ -40,7 +40,7 @@ echo ""
 echo -e "${YELLOW}Checking swap contract USDC balance...${NC}"
 SWAP_BALANCE=$(sncast call --url "$STARKNET_RPC_URL" \
     --contract-address "$USDC_ADDRESS" \
-    --function "balanceOf" \
+    --function "balance_of" \
     --calldata "$ADAM_SWAP_ADDRESS" 2>&1)
 
 if echo "$SWAP_BALANCE" | grep -q "Success"; then

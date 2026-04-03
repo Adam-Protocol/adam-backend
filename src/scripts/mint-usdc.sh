@@ -45,7 +45,7 @@ if echo "$USDC_RESULT" | grep -q "Transaction Hash"; then
     echo -e "${YELLOW}Checking balance...${NC}"
     sncast call --url "$STARKNET_RPC_URL" \
         --contract-address "$USDC_ADDRESS" \
-        --function "balanceOf" \
+        --function "balance_of" \
         --calldata "$RECIPIENT"
 else
     echo -e "${RED}❌ Failed to mint USDC${NC}"

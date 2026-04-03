@@ -6,6 +6,7 @@ import { Queue } from 'bullmq';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { FlutterwaveService } from '../offramp/flutterwave.service';
+import { ContractRatesService } from './contract-rates.service';
 import { SwapDto } from './swap.dto';
 import { RateSource } from './rate-source.enum';
 import { SUPPORTED_CURRENCIES, CURRENCY_PAIRS } from './currency-rates.config';
@@ -20,12 +21,13 @@ interface CurrencyRate {
 export class SwapService {
   private readonly logger = new Logger(SwapService.name);
   private cachedRates: Map<string, CurrencyRate> = new Map();
-  private defaultRateSource: RateSource = RateSource.EXCHANGE_RATE_API;
+  private defaultRateSource: RateSource = RateSource.CONTRACT;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly flutterwave: FlutterwaveService,
+    private readonly contractRates: ContractRatesService,
     @InjectQueue('chain-tx') private readonly chainTxQueue: Queue,
   ) { }
 
@@ -135,15 +137,49 @@ export class SwapService {
     }
   }
 
-  /** Refresh rates from configured source and enqueue on-chain set_rate calls */
+  /** Fetch rates from Starknet contract */
+  private async fetchFromContract(): Promise<Record<string, number>> {
+    const rates: Record<string, number> = {};
+
+    for (const currency of Object.keys(SUPPORTED_CURRENCIES)) {
+      try {
+        const { forward } = await this.contractRates.getCurrencyRates(currency);
+        rates[currency] = forward;
+        this.logger.debug(`Fetched ${currency} rate from contract: ${forward}`);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch ${currency} rate from contract:`,
+          error,
+        );
+        throw error; // Re-throw to trigger fallback
+      }
+    }
+
+    return rates;
+  }
+
   @Cron(CronExpression.EVERY_5_MINUTES)
   async refreshRate() {
     try {
       let rates: Record<string, number> = {};
       let source: RateSource;
 
-      // Fetch from default source
-      if (this.defaultRateSource === RateSource.FLUTTERWAVE) {
+      // Try to fetch from contract first (primary source)
+      if (this.defaultRateSource === RateSource.CONTRACT) {
+        try {
+          this.logger.log('Fetching rates from Starknet contract...');
+          rates = await this.fetchFromContract();
+          source = RateSource.CONTRACT;
+          this.logger.log('Successfully fetched rates from contract');
+        } catch (error) {
+          this.logger.warn(
+            'Failed to fetch rates from contract, falling back to ExchangeRate-API',
+            error,
+          );
+          rates = await this.fetchFromExchangeRateApi();
+          source = RateSource.EXCHANGE_RATE_API;
+        }
+      } else if (this.defaultRateSource === RateSource.FLUTTERWAVE) {
         // Try Flutterwave first for each currency
         const flutterwaveRates: Record<string, number> = {};
         for (const currency of Object.keys(SUPPORTED_CURRENCIES)) {
