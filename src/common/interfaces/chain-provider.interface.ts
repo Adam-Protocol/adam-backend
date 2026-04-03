@@ -3,6 +3,7 @@ export interface ExecuteTransactionDto {
   /** Chain-neutral name for the function/entrypoint to call */
   functionName: string;
   calldata: any[];
+  nonce?: number;
 }
 
 export interface IChainProvider {
