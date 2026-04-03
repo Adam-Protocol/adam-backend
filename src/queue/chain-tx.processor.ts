@@ -3,22 +3,18 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { StarknetService } from '../starknet/starknet.service';
-import { StacksService } from '../stacks/stacks.service';
 import { FlutterwaveService } from '../offramp/flutterwave.service';
-import { uint256 } from 'starknet';
-import { uintCV, contractPrincipalCV } from '@stacks/transactions';
+import { ChainManagerService, ChainType } from '../common/providers/chain-manager.service';
 
 @Processor('chain-tx')
 export class ChainTxProcessor extends WorkerHost {
   private readonly logger = new Logger(ChainTxProcessor.name);
 
   constructor(
-    private readonly starknet: StarknetService,
-    private readonly stacks: StacksService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly flutterwave: FlutterwaveService,
+    private readonly chainManager: ChainManagerService,
   ) {
     super();
   }
@@ -34,6 +30,7 @@ export class ChainTxProcessor extends WorkerHost {
             amount_in: string;
             token_out: string;
             commitment: string;
+            chain?: string;
           },
         );
       case 'process-bank-transfer':
@@ -56,17 +53,17 @@ export class ChainTxProcessor extends WorkerHost {
             token_out: string;
             min_amount_out: string;
             commitment: string;
+            chain?: string;
           },
         );
       case 'push-rate':
         return this.processRateUpdate(job.data as { usd_ngn: number });
       case 'push-rates':
-        return this.processMultiCurrencyRateUpdate(
-          job.data as { rates: Record<string, number> },
-        );
       case 'push-rates-stacks':
-        return this.processStacksRateUpdate(
-          job.data as { rates: Record<string, number> },
+        // Both queues now map to the same payload format with an explicit chain parameter
+        return this.processMultiCurrencyRateUpdate(
+          job.data as { rates: Record<string, number>, chain?: string },
+          job.name === 'push-rates-stacks' ? ChainType.STACKS : ChainType.STARKNET
         );
       default:
         this.logger.warn(`Unknown job: ${job.name}`);
@@ -169,8 +166,9 @@ export class ChainTxProcessor extends WorkerHost {
     amount_in: string;
     token_out: string;
     commitment: string;
+    chain?: string;
   }) {
-    const { transactionId, amount_in, token_out, commitment } = data;
+    const { transactionId, amount_in, token_out, commitment, chain = 'STARKNET' } = data;
 
     try {
       await this.prisma.transaction.update({
@@ -178,11 +176,22 @@ export class ChainTxProcessor extends WorkerHost {
         data: { status: 'processing' },
       });
 
-      const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
-      const usdcAddress = this.config.get<string>('USDC_ADDRESS');
+      const handler = this.chainManager.getHandler(chain.toUpperCase());
+      
+      const isStacks = chain.toUpperCase() === ChainType.STACKS;
 
-      // Map token names to addresses
-      const tokenAddresses: Record<string, string> = {
+      // Note: we're reusing token_out as the key for identifying the token.
+      // But for Stacks we might just need to pass the raw token name/address if supported in handler.
+      // For now we map it directly inside the specific handlers, so we just need to pass the symbolic names, 
+      // or we can pass the explicit address.
+      // Wait, let's map the token output address first so we don't have to change much logic down stream:
+      const tokenAddresses: Record<string, string> = isStacks ? {
+        adusd: this.config.get<string>('STACKS_ADUSD_ADDRESS')!,
+        adngn: this.config.get<string>('STACKS_ADNGN_ADDRESS')!,
+        adkes: this.config.get<string>('STACKS_ADKES_ADDRESS')!,
+        adghs: this.config.get<string>('STACKS_ADGHS_ADDRESS')!,
+        adzar: this.config.get<string>('STACKS_ADZAR_ADDRESS')!,
+      } : {
         adusd: this.config.get<string>('ADUSD_ADDRESS')!,
         adngn: this.config.get<string>('ADNGN_ADDRESS')!,
         adkes: this.config.get<string>('ADKES_ADDRESS')!,
@@ -192,25 +201,15 @@ export class ChainTxProcessor extends WorkerHost {
 
       const tokenOutAddress = tokenAddresses[token_out.toLowerCase()];
       if (!tokenOutAddress) {
-        throw new Error(`Unknown token: ${token_out}`);
+        throw new Error(`Unknown token: ${token_out} on ${chain}`);
       }
 
-      const amountU256 = uint256.bnToUint256(BigInt(amount_in));
-
-      // Approval is now done in the frontend, so we only execute the buy
-      const txHash = await this.starknet.execute([
-        {
-          contractAddress: swapAddress!,
-          entrypoint: 'buy',
-          calldata: [
-            usdcAddress!,
-            amountU256.low.toString(),
-            amountU256.high.toString(),
-            tokenOutAddress!,
-            commitment,
-          ],
-        },
-      ]);
+      const txHash = await handler.executeBuy({
+        transactionId,
+        amountIn: BigInt(amount_in),
+        tokenOutAddress,
+        commitment,
+      });
 
       await this.prisma.transaction.update({
         where: { id: transactionId },
@@ -238,6 +237,7 @@ export class ChainTxProcessor extends WorkerHost {
     token_out: string;
     min_amount_out: string;
     commitment: string;
+    chain?: string;
   }) {
     const {
       transactionId,
@@ -246,6 +246,7 @@ export class ChainTxProcessor extends WorkerHost {
       token_out,
       min_amount_out,
       commitment,
+      chain = 'STARKNET',
     } = data;
 
     try {
@@ -254,10 +255,16 @@ export class ChainTxProcessor extends WorkerHost {
         data: { status: 'processing' },
       });
 
-      const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
+      const handler = this.chainManager.getHandler(chain.toUpperCase());
+      const isStacks = chain.toUpperCase() === ChainType.STACKS;
 
-      // Map token names to addresses
-      const tokenAddresses: Record<string, string> = {
+      const tokenAddresses: Record<string, string> = isStacks ? {
+        adusd: this.config.get<string>('STACKS_ADUSD_ADDRESS')!,
+        adngn: this.config.get<string>('STACKS_ADNGN_ADDRESS')!,
+        adkes: this.config.get<string>('STACKS_ADKES_ADDRESS')!,
+        adghs: this.config.get<string>('STACKS_ADGHS_ADDRESS')!,
+        adzar: this.config.get<string>('STACKS_ADZAR_ADDRESS')!,
+      } : {
         adusd: this.config.get<string>('ADUSD_ADDRESS')!,
         adngn: this.config.get<string>('ADNGN_ADDRESS')!,
         adkes: this.config.get<string>('ADKES_ADDRESS')!,
@@ -275,24 +282,14 @@ export class ChainTxProcessor extends WorkerHost {
         throw new Error(`Unknown token_out: ${token_out}`);
       }
 
-      const amountInU256 = uint256.bnToUint256(BigInt(amount_in));
-      const minOutU256 = uint256.bnToUint256(BigInt(min_amount_out));
-
-      const txHash = await this.starknet.execute([
-        {
-          contractAddress: swapAddress!,
-          entrypoint: 'swap',
-          calldata: [
-            tokenInAddr!,
-            amountInU256.low.toString(),
-            amountInU256.high.toString(),
-            tokenOutAddr!,
-            minOutU256.low.toString(),
-            minOutU256.high.toString(),
-            commitment,
-          ],
-        },
-      ]);
+      const txHash = await handler.executeSwap({
+        transactionId,
+        tokenInAddress: tokenInAddr,
+        amountIn: BigInt(amount_in),
+        tokenOutAddress: tokenOutAddr,
+        minAmountOut: BigInt(min_amount_out),
+        commitment,
+      });
 
       await this.prisma.transaction.update({
         where: { id: transactionId },
@@ -313,250 +310,26 @@ export class ChainTxProcessor extends WorkerHost {
   }
 
   private async processRateUpdate(data: { usd_ngn: number }) {
+    // For backwards compatibility: update just Starknet with USD_NGN payload
     try {
-      const { usd_ngn } = data;
-      const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
-      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
-      const adngnAddress = this.config.get<string>('ADNGN_ADDRESS');
-
-      // rate scaled by 1e18: how many ADNGN wei per 1 ADUSD wei
-      const rateBigInt = BigInt(Math.round(usd_ngn * 1e18));
-      const rateU256 = uint256.bnToUint256(rateBigInt);
-      const inverseRateBigInt = BigInt(Math.round((1 / usd_ngn) * 1e18));
-      const inverseU256 = uint256.bnToUint256(inverseRateBigInt);
-
-      await this.starknet.execute([
-        // ADUSD -> ADNGN
-        {
-          contractAddress: swapAddress!,
-          entrypoint: 'set_rate',
-          calldata: [
-            adusdAddress!,
-            adngnAddress!,
-            rateU256.low.toString(),
-            rateU256.high.toString(),
-          ],
-        },
-        // ADNGN -> ADUSD
-        {
-          contractAddress: swapAddress!,
-          entrypoint: 'set_rate',
-          calldata: [
-            adngnAddress!,
-            adusdAddress!,
-            inverseU256.low.toString(),
-            inverseU256.high.toString(),
-          ],
-        },
-      ]);
-
-      this.logger.log(`Rate updated on-chain: 1 ADUSD = ${usd_ngn} ADNGN`);
+      const handler = this.chainManager.getHandler(ChainType.STARKNET);
+      await handler.executeRateUpdate({ rates: { NGN: data.usd_ngn } });
     } catch (err: unknown) {
       this.logger.error('Rate update on-chain failed', err);
       throw err;
     }
   }
 
-  private async processMultiCurrencyRateUpdate(data: {
-    rates: Record<string, number>;
-  }) {
+  private async processMultiCurrencyRateUpdate(
+    data: { rates: Record<string, number>, chain?: string },
+    chain: ChainType = ChainType.STARKNET
+  ) {
     try {
-      const { rates } = data;
-      const swapAddress = this.config.get<string>('ADAM_SWAP_ADDRESS');
-      const adusdAddress = this.config.get<string>('ADUSD_ADDRESS');
-
-      // Map of currency code to token address
-      const tokenAddresses: Record<string, string> = {
-        NGN: this.config.get<string>('ADNGN_ADDRESS')!,
-        KES: this.config.get<string>('ADKES_ADDRESS')!,
-        GHS: this.config.get<string>('ADGHS_ADDRESS')!,
-        ZAR: this.config.get<string>('ADZAR_ADDRESS')!,
-      };
-
-      const calls: Array<{
-        contractAddress: string;
-        entrypoint: string;
-        calldata: string[];
-      }> = [];
-
-      // Set rates for each currency pair
-      for (const [currency, rate] of Object.entries(rates)) {
-        const tokenAddress = tokenAddresses[currency];
-        if (!tokenAddress) {
-          this.logger.warn(`No token address configured for ${currency}`);
-          continue;
-        }
-
-        // rate scaled by 1e18: how many AD{CURRENCY} wei per 1 ADUSD wei
-        const rateBigInt = BigInt(Math.round(rate * 1e18));
-        const rateU256 = uint256.bnToUint256(rateBigInt);
-        const inverseRateBigInt = BigInt(Math.round((1 / rate) * 1e18));
-        const inverseU256 = uint256.bnToUint256(inverseRateBigInt);
-
-        // ADUSD -> AD{CURRENCY}
-        calls.push({
-          contractAddress: swapAddress!,
-          entrypoint: 'set_rate',
-          calldata: [
-            adusdAddress!,
-            tokenAddress,
-            rateU256.low.toString(),
-            rateU256.high.toString(),
-          ],
-        });
-
-        // AD{CURRENCY} -> ADUSD
-        calls.push({
-          contractAddress: swapAddress!,
-          entrypoint: 'set_rate',
-          calldata: [
-            tokenAddress,
-            adusdAddress!,
-            inverseU256.low.toString(),
-            inverseU256.high.toString(),
-          ],
-        });
-
-        this.logger.log(`Rate prepared: 1 ADUSD = ${rate} ${currency}`);
-      }
-
-      if (calls.length > 0) {
-        await this.starknet.execute(calls);
-        this.logger.log(
-          `Multi-currency rates updated on-chain for ${Object.keys(rates).join(', ')}`,
-        );
-      }
+      const targetChain = data.chain || chain;
+      const handler = this.chainManager.getHandler(targetChain.toUpperCase());
+      await handler.executeRateUpdate(data);
     } catch (err: unknown) {
-      this.logger.error('Multi-currency rate update on-chain failed', err);
-      throw err;
-    }
-  }
-
-  private async processStacksRateUpdate(data: {
-    rates: Record<string, number>;
-  }) {
-    try {
-      const { rates } = data;
-      const swapContractId = this.config.get<string>('STACKS_ADAM_SWAP_ADDRESS');
-      const deployerAddress = this.config.get<string>('STACKS_DEPLOYER_ADDRESS');
-
-      if (!swapContractId || !deployerAddress) {
-        this.logger.error('Stacks contract configuration missing');
-        throw new Error('Stacks contract configuration missing');
-      }
-
-      // Map of currency code to token contract name
-      const tokenContracts: Record<string, string> = {
-        USD: 'adam-token-adusd-v2',
-        NGN: 'adam-token-adngn-v2',
-        KES: 'adam-token-adkes-v2',
-        GHS: 'adam-token-adghs-v2',
-        ZAR: 'adam-token-adzar-v2',
-      };
-
-      const usdcContract = 'usdcx-v3';
-      const adusdContract = tokenContracts.USD;
-
-      // Convert rates to 6 decimal precision (1e6) for Stacks
-      const convertRate = (rate: number): string => {
-        return Math.round(rate * 1e6).toString();
-      };
-
-      // Prepare all rate update calls
-      const rateCalls: Array<{
-        from: string;
-        to: string;
-        rate: string;
-        label: string;
-      }> = [];
-
-      // USDC <-> ADUSD (1:1)
-      rateCalls.push(
-        {
-          from: usdcContract,
-          to: adusdContract,
-          rate: convertRate(1),
-          label: 'USDC → ADUSD',
-        },
-        {
-          from: adusdContract,
-          to: usdcContract,
-          rate: convertRate(1),
-          label: 'ADUSD → USDC',
-        },
-      );
-
-      // For each currency, set USDC <-> AD{CURRENCY} and ADUSD <-> AD{CURRENCY}
-      for (const [currency, rate] of Object.entries(rates)) {
-        const tokenContract = tokenContracts[currency];
-        if (!tokenContract) {
-          this.logger.warn(`No token contract configured for ${currency}`);
-          continue;
-        }
-
-        const forwardRate = convertRate(rate);
-        const inverseRate = convertRate(1 / rate);
-
-        // USDC <-> AD{CURRENCY}
-        rateCalls.push(
-          {
-            from: usdcContract,
-            to: tokenContract,
-            rate: forwardRate,
-            label: `USDC → AD${currency}`,
-          },
-          {
-            from: tokenContract,
-            to: usdcContract,
-            rate: inverseRate,
-            label: `AD${currency} → USDC`,
-          },
-        );
-
-        // ADUSD <-> AD{CURRENCY}
-        rateCalls.push(
-          {
-            from: adusdContract,
-            to: tokenContract,
-            rate: forwardRate,
-            label: `ADUSD → AD${currency}`,
-          },
-          {
-            from: tokenContract,
-            to: adusdContract,
-            rate: inverseRate,
-            label: `AD${currency} → ADUSD`,
-          },
-        );
-
-        this.logger.log(`Rate prepared: 1 USD = ${rate} ${currency}`);
-      }
-
-      // Execute all rate updates sequentially (Stacks doesn't support batch like Starknet)
-      for (const call of rateCalls) {
-        try {
-          const txid = await this.stacks.executeTransaction({
-            contractAddress: swapContractId,
-            functionName: 'set-rate',
-            calldata: [
-              contractPrincipalCV(deployerAddress, call.from),
-              contractPrincipalCV(deployerAddress, call.to),
-              uintCV(call.rate),
-            ],
-          });
-
-          this.logger.log(`${call.label}: ${call.rate} (txid: ${txid})`);
-        } catch (error) {
-          this.logger.error(`Failed to set rate ${call.label}:`, error);
-          // Continue with other rates even if one fails
-        }
-      }
-
-      this.logger.log(
-        `Stacks rates updated for ${Object.keys(rates).join(', ')}`,
-      );
-    } catch (err: unknown) {
-      this.logger.error('Stacks rate update failed', err);
+      this.logger.error(`Multi-currency rate update on-chain failed for ${chain}`, err);
       throw err;
     }
   }

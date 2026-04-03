@@ -38,6 +38,20 @@ export class StacksService implements IChainProvider {
     }
   }
 
+  async getNextNonce(address: string): Promise<number | undefined> {
+    try {
+      const url = `${this.network.client.baseUrl}/extended/v1/address/${address}/nonces`;
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const data = await resp.json() as any;
+        return data.possible_next_nonce;
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to fetch nonce for ${address}:`, err);
+    }
+    return undefined;
+  }
+
   async getBalance(tokenAddress: string, accountAddress: string): Promise<bigint> {
     try {
       
@@ -95,6 +109,16 @@ export class StacksService implements IChainProvider {
       throw new Error('Stacks deployer private key not configured');
     }
 
+    let senderKey = this.deployerKey;
+    if (senderKey.includes(' ')) {
+      const { generateWallet } = await import('@stacks/wallet-sdk');
+      const wallet = await generateWallet({
+        secretKey: senderKey,
+        password: 'password',
+      });
+      senderKey = wallet.accounts[0].stxPrivateKey;
+    }
+
     const [contractAddress, contractName] = payload.contractAddress.split('.');
 
     const txOptions = {
@@ -102,9 +126,10 @@ export class StacksService implements IChainProvider {
       contractName,
       functionName: payload.functionName,
       functionArgs: payload.calldata as unknown as ClarityValue[],
-      senderKey: this.deployerKey,
+      senderKey,
       validateWithAbi: true,
       network: this.network,
+      nonce: payload.nonce,
     };
 
     try {
