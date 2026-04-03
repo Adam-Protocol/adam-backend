@@ -79,11 +79,11 @@ export class StacksChainHandler implements IChainHandler {
     }
 
     const tokenContracts: Record<string, string> = {
-      USD: 'adam-token-adusd-v2',
-      NGN: 'adam-token-adngn-v2',
-      KES: 'adam-token-adkes-v2',
-      GHS: 'adam-token-adghs-v2',
-      ZAR: 'adam-token-adzar-v2',
+      USD: 'adam-token-adusd-v3',
+      NGN: 'adam-token-adngn-v3',
+      KES: 'adam-token-adkes-v3',
+      GHS: 'adam-token-adghs-v3',
+      ZAR: 'adam-token-adzar-v3',
     };
 
     const usdcContract = 'usdcx-v3';
