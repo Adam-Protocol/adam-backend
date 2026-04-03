@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { FlutterwaveService } from '../offramp/flutterwave.service';
+import { ContractRatesService } from './contract-rates.service';
 
 describe('SwapService', () => {
   let service: SwapService;
@@ -35,6 +36,7 @@ describe('SwapService', () => {
         SwapService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: FlutterwaveService, useValue: { getExchangeRate: jest.fn() } },
+        { provide: ContractRatesService, useValue: { getCurrencyRates: jest.fn() } },
         { provide: ConfigService, useValue: mockConfig },
         { provide: getQueueToken('chain-tx'), useValue: mockQueue },
       ],
