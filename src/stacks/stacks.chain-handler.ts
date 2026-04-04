@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { StacksService } from './stacks.service';
 import { IChainHandler, RateUpdatePayload } from '../queue/chain-handler.interface';
-import { uintCV, contractPrincipalCV } from '@stacks/transactions';
+import { uintCV, contractPrincipalCV, principalCV } from '@stacks/transactions';
 
 @Injectable()
 export class StacksChainHandler implements IChainHandler {
@@ -12,7 +12,7 @@ export class StacksChainHandler implements IChainHandler {
   constructor(
     private readonly stacks: StacksService,
     private readonly config: ConfigService,
-  ) {}
+  ) { }
 
   async executeBuy(data: {
     transactionId: string;
@@ -21,7 +21,7 @@ export class StacksChainHandler implements IChainHandler {
     commitment: string;
   }): Promise<string> {
     const swapContractId = this.config.get<string>('STACKS_ADAM_SWAP_ADDRESS');
-    
+
     if (!swapContractId) {
       throw new Error('Missing Stacks swap contract configuration');
     }
@@ -50,7 +50,7 @@ export class StacksChainHandler implements IChainHandler {
     commitment: string;
   }): Promise<string> {
     const swapContractId = this.config.get<string>('STACKS_ADAM_SWAP_ADDRESS');
-    
+
     if (!swapContractId) {
       throw new Error('Missing Stacks swap contract configuration');
     }
@@ -142,12 +142,16 @@ export class StacksChainHandler implements IChainHandler {
 
     for (const call of rateCalls) {
       try {
+        // Create contract principals for the token contracts
+        const fromPrincipal = contractPrincipalCV(deployerAddress, call.from);
+        const toPrincipal = contractPrincipalCV(deployerAddress, call.to);
+
         const txid = await this.stacks.executeTransaction({
           contractAddress: swapContractId,
           functionName: 'set-rate',
           calldata: [
-            contractPrincipalCV(deployerAddress, call.from),
-            contractPrincipalCV(deployerAddress, call.to),
+            fromPrincipal,
+            toPrincipal,
             uintCV(call.rate),
           ],
           nonce: currentNonce,
